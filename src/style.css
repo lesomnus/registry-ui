@@ -78,8 +78,14 @@ header {
 }
 
 #domain {
-  flex: 1 1 260px;
-  min-width: 200px;
+  flex: 1 1 240px;
+  min-width: 180px;
+  font-family: var(--mono);
+}
+
+#forwarder {
+  flex: 1 1 180px;
+  min-width: 140px;
   font-family: var(--mono);
 }
 

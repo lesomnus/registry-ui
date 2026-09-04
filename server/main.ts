@@ -35,6 +35,19 @@ import { file } from "bun";
 const port = Number(process.env["PORT"] ?? 8080);
 const allowPrivateTargets = process.env["ALLOW_PRIVATE_TARGETS"] === "true";
 
+/**
+ * Who may call this from a browser.
+ *
+ * The page does not have to be served from here -- a static build on a plain
+ * file server is the smaller deployment, and then the forwarder is a different
+ * origin. `*` is the default and is not the hole it looks like: this holds no
+ * credentials, so allowing any page to call it grants that page nothing it
+ * could not get by running the same request itself. What it must not do is
+ * allow *cookies*, and it does not: `Access-Control-Allow-Credentials` is never
+ * sent, so a browser refuses to attach any.
+ */
+const allowedOrigin = process.env["ALLOWED_ORIGIN"] ?? "*";
+
 /** A manifest or a signature bundle is kilobytes. A layer is not, and is never wanted here. */
 const maximumBodyBytes = Number(process.env["MAX_BODY_BYTES"] ?? 8 * 1024 * 1024);
 
@@ -75,10 +88,30 @@ function isPrivateAddress(hostname: string): boolean {
   return privatePatterns.some((pattern) => pattern.test(bare));
 }
 
+/**
+ * The CORS headers every answer from the forwarder carries.
+ *
+ * `Access-Control-Expose-Headers` is the one that is easy to leave out and
+ * expensive to leave out: without it a browser hands the page a response whose
+ * `Docker-Content-Digest` and `Link` read as absent. Nothing errors -- pages
+ * just paginate once and report a digest of "-", which looks like a registry
+ * that does not send them.
+ */
+function corsHeaders(): Record<string, string> {
+  return {
+    "access-control-allow-origin": allowedOrigin,
+    "access-control-allow-methods": "GET, HEAD, OPTIONS",
+    "access-control-allow-headers": "authorization, accept, range",
+    "access-control-expose-headers": passThrough.join(", "),
+    "access-control-max-age": "86400",
+    "vary": "Origin",
+  };
+}
+
 function refuse(status: number, message: string): Response {
   return new Response(JSON.stringify({ errors: [{ code: "FORWARDER", message, detail: null }] }), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8" },
+    headers: { "content-type": "application/json; charset=utf-8", ...corsHeaders() },
   });
 }
 
@@ -119,7 +152,7 @@ async function forward(request: Request, raw: string): Promise<Response> {
     return refuse(413, `${declared} bytes is more than this forwards`);
   }
 
-  const out = new Headers();
+  const out = new Headers(corsHeaders());
   for (const name of passThrough) {
     const value = upstream.headers.get(name);
     if (value !== null) {
@@ -136,6 +169,12 @@ const server = Bun.serve({
     const url = new URL(request.url);
 
     if (url.pathname === "/-/fetch") {
+      // The page sends Authorization, which is not a simple header, so a
+      // cross-origin call arrives as a preflight first.
+      if (request.method === "OPTIONS") {
+        return new Response(null, { status: 204, headers: corsHeaders() });
+      }
+
       if (request.method !== "GET" && request.method !== "HEAD") {
         return refuse(405, "only GET and HEAD are forwarded");
       }
@@ -146,6 +185,10 @@ const server = Bun.serve({
       }
 
       return await forward(request, target);
+    }
+
+    if (url.pathname === "/-/health") {
+      return new Response("ok\n", { headers: { "content-type": "text/plain; charset=utf-8" } });
     }
 
     const asset = staticFiles[url.pathname];

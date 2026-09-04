@@ -17,6 +17,8 @@ export type Connection = {
   direct?: boolean;
   /** Reach it over http. A registry on your own machine usually has no TLS. */
   insecure?: boolean;
+  /** Where the forwarder is, when it is not served from this origin. */
+  forwarder?: string;
 };
 
 /**
@@ -35,7 +37,7 @@ export type Connection = {
  * every registry has learned to accept one.
  */
 export function connect(connection: Connection): RegistryClient {
-  const wire = connection.direct ? new DirectTransport() : new ProxyTransport();
+  const wire = connection.direct ? new DirectTransport() : new ProxyTransport(connection.forwarder);
   const credential =
     connection.username && connection.password
       ? { username: connection.username, password: connection.password }

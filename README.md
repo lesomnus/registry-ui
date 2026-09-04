@@ -12,6 +12,12 @@ npm run build
 npm run serve        # http://localhost:8080
 ```
 
+Or as containers:
+
+```bash
+docker compose up --build     # page on :8080, forwarder on :8081
+```
+
 Then type a registry: `registry.example`, `index.docker.io`, `localhost:5000`.
 Credentials are optional and are used only if the registry asks for them.
 
@@ -49,6 +55,30 @@ the chain, not the dates, not the signature. It reports what a signature claims
 about itself, and `cosign verify` or `notation verify` is what decides whether
 to believe it.
 
+## Containers
+
+Two images, because they are two different things.
+
+**`Dockerfile`** builds the page and serves it with
+[static-web-server](https://static-web-server.net) — about 12 MB, no runtime,
+compression and ETag and a health endpoint for free. It is only the page: SWS
+does not reverse proxy and
+[is not going to](https://github.com/static-web-server/static-web-server/issues/489),
+so the forwarder is not in it.
+
+**`Dockerfile.forwarder`** is the forwarder, for registries that do not send
+CORS headers.
+
+Against a registry that *does* send them — zot, or anything behind an ingress
+that adds them — run the page alone and tick **direct**. There is then nothing
+else to deploy and nothing that can be asked to fetch a URL.
+
+Otherwise run both. The page is a different origin from the forwarder, so the
+forwarder sends CORS headers and `ALLOWED_ORIGIN` says who may call it. The
+forwarder's URL is typed into the page, which keeps the image free of runtime
+configuration: the same static build works wherever it is served from, including
+somewhere that is not a server at all.
+
 ## Why there is a server
 
 A registry answers `fetch` from a page only if it sends
@@ -76,6 +106,17 @@ address is not caught. **Do not put this on the public internet.**
 | `PORT`                  | Default `8080`.                                                 |
 | `ALLOW_PRIVATE_TARGETS` | `true` to reach a registry on your own network or machine.      |
 | `MAX_BODY_BYTES`        | Default 8 MiB.                                                  |
+| `ALLOWED_ORIGIN`        | Who may call it from a browser. Default `*`.                    |
+
+`*` is not the hole it looks like: the forwarder holds no credentials, so
+allowing any page to call it grants that page nothing it could not get by making
+the request itself. It never sends `Access-Control-Allow-Credentials`, so a
+browser will not attach cookies to it either. Naming the page is still tighter.
+
+It answers preflights, and it lists what a page may read back in
+`Access-Control-Expose-Headers` — without that a browser hands the page a
+response whose `Docker-Content-Digest` and `Link` read as absent, and nothing
+errors: pages just stop paginating and digests come out as `-`.
 
 Tick **direct** in the page to skip the forwarder and talk to the registry from
 the browser. Correct for a registry that sends CORS headers, and then nothing

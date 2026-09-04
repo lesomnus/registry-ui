@@ -21,9 +21,13 @@ import type { ReqInit, Transport } from "@lesomnus/oci-client";
 export class ProxyTransport implements Transport {
   private readonly endpoint: string;
 
-  /** @param endpoint the forwarder's path on this origin. */
+  /**
+   * @param endpoint where the forwarder is. A path when it is served from this
+   * origin, which is what the bundled server does; a full URL when the page is
+   * a static build somewhere else and the forwarder is its own deployment.
+   */
   constructor(endpoint = "/-/fetch") {
-    this.endpoint = endpoint;
+    this.endpoint = endpoint.replace(/\/+$/, "") || "/-/fetch";
   }
 
   fetch(resource: RequestInfo | URL, init?: ReqInit): Promise<Response> {

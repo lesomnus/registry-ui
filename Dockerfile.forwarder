@@ -1,0 +1,16 @@
+# The forwarder, for registries that do not send CORS headers.
+#
+# It holds no credentials and has no configuration beyond the two knobs below --
+# see the warning in the README about what it is: anything that can reach it can
+# ask it to fetch a URL.
+
+FROM oven/bun:1-alpine
+WORKDIR /app
+COPY server ./server
+
+# Nothing is written at runtime, so the files stay owned by root and read-only.
+USER 65532:65532
+
+ENV PORT=8080
+EXPOSE 8080
+CMD ["bun", "run", "server/main.ts"]

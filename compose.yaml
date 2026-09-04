@@ -1,0 +1,21 @@
+# The two halves, for a registry that does not send CORS headers.
+#
+# With one that does, the forwarder is unnecessary: run `page` alone and tick
+# "direct" in the UI.
+services:
+  page:
+    build: .
+    ports: ["8080:8080"]
+
+  forwarder:
+    build:
+      context: .
+      dockerfile: Dockerfile.forwarder
+    ports: ["8081:8080"]
+    environment:
+      # The page is a different origin here, so the forwarder has to allow it.
+      # `*` is the default and is safe for what this is -- it holds no
+      # credentials and never allows cookies -- but naming the page is tighter.
+      ALLOWED_ORIGIN: "http://localhost:8080"
+      # Uncomment to browse a registry on this machine or network.
+      # ALLOW_PRIVATE_TARGETS: "true"
