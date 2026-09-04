@@ -10,6 +10,7 @@ const el = {
   username: document.getElementById("username") as HTMLInputElement,
   password: document.getElementById("password") as HTMLInputElement,
   direct: document.getElementById("direct") as HTMLInputElement,
+  insecure: document.getElementById("insecure") as HTMLInputElement,
   status: document.getElementById("status") as HTMLElement,
   repositoryList: document.getElementById("repository-list") as HTMLElement,
   repositoryCount: document.getElementById("repository-count") as HTMLElement,
@@ -36,8 +37,8 @@ function saveConnection(connection: Connection): void {
   try {
     // The password is deliberately not among these. A registry credential in
     // localStorage outlives the tab, the session and the person's attention.
-    const { domain, username, direct } = connection;
-    localStorage.setItem(remembered, JSON.stringify({ domain, username, direct }));
+    const { domain, username, direct, insecure } = connection;
+    localStorage.setItem(remembered, JSON.stringify({ domain, username, direct, insecure }));
   } catch {
     // A browser that refuses storage is one that still browses a registry.
   }
@@ -49,6 +50,7 @@ function restoreConnection(): void {
     el.domain.value = saved.domain ?? "";
     el.username.value = saved.username ?? "";
     el.direct.checked = saved.direct === true;
+    el.insecure.checked = saved.insecure === true;
   } catch {
     // Nothing remembered, which is the same as nothing to restore.
   }
@@ -209,6 +211,7 @@ el.form.addEventListener("submit", (event) => {
     username: el.username.value.trim() || undefined,
     password: el.password.value || undefined,
     direct: el.direct.checked,
+    insecure: el.insecure.checked,
   });
 });
 

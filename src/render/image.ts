@@ -1,13 +1,9 @@
+import { indexMediaTypes } from "../media-types";
 import type { RegistryClient } from "../registry";
 import type { Descriptor } from "./artifact";
 import { artifactName, isSignature, openArtifact } from "./artifact";
 import type { Cell } from "./dom";
 import { definitions, element, formatSize, shortDigest, table } from "./dom";
-
-const indexMediaTypes = new Set([
-  "application/vnd.oci.image.index.v1+json",
-  "application/vnd.docker.distribution.manifest.list.v2+json",
-]);
 
 type Child = { digest: string; mediaType?: string; platform?: { os?: string; architecture?: string; variant?: string } };
 type Manifest = {

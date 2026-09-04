@@ -1,4 +1,6 @@
-import { ClientV2, TransportAuthorizer, ext } from "@lesomnus/oci-client";
+import { Accept, ClientV2, TransportAuthorizer, Unsecure, ext } from "@lesomnus/oci-client";
+import type { Transport, TransportMiddleware } from "@lesomnus/oci-client";
+import { manifestMediaTypes } from "./media-types";
 import { DirectTransport, ProxyTransport } from "./transport";
 
 /** ClientV2, plus `_catalog`, which is not in the distribution spec. */
@@ -13,6 +15,8 @@ export type Connection = {
   password?: string;
   /** Talk to the registry from the page, with no forwarder. See transport.ts. */
   direct?: boolean;
+  /** Reach it over http. A registry on your own machine usually has no TLS. */
+  insecure?: boolean;
 };
 
 /**
@@ -37,7 +41,18 @@ export function connect(connection: Connection): RegistryClient {
       ? { username: connection.username, password: connection.password }
       : undefined;
 
-  return new Client(connection.domain, {
-    transport: [new TransportAuthorizer({ credential }), wire],
-  });
+  // Accept goes first so it is on the request the authorizer retries as well:
+  // a manifest request that does not say what it can read is answered with
+  // whatever the registry prefers, or with a 404 for a manifest it cannot put
+  // in a form the caller claimed to understand.
+  //
+  // Unsecure is last, on the way out, so everything above it goes on building
+  // https URLs and does not have to know.
+  const accept = new Accept({ manifests: manifestMediaTypes });
+  const authorizer = new TransportAuthorizer({ credential });
+  const transport: [TransportMiddleware, ...TransportMiddleware[], Transport] = connection.insecure
+    ? [accept, authorizer, new Unsecure(), wire]
+    : [accept, authorizer, wire];
+
+  return new Client(connection.domain, { transport });
 }
