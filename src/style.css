@@ -184,10 +184,14 @@ h2 {
 
 .caret {
   flex: none;
-  width: 10px;
-  margin-right: 2px;
+  width: 12px;
   color: var(--text-muted);
   font-size: 9px;
+  text-align: center;
+}
+
+.caret:hover {
+  color: var(--accent);
 }
 
 input[type="search"] {
@@ -236,8 +240,7 @@ input[type="search"]:focus {
 .list button {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 2px;
   width: 100%;
   padding: 6px 8px;
   border: 0;

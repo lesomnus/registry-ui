@@ -103,33 +103,40 @@ export function flattenTree(
 
       const groupPath = `${folded.path}/`;
       const open = expanded.has(groupPath);
-      rows.push({
-        key: groupPath,
-        path: groupPath,
-        group: true,
-        label,
-        depth,
-        expandable: true,
-        expanded: open,
-        current: false,
-        onSelect: () => onToggleGroup(groupPath),
-      });
 
-      // A path that is both a repository and a prefix appears twice on purpose:
-      // once as the group holding what is under it, once as the thing itself.
+      // A path can be a repository *and* a prefix -- `hello` beside
+      // `hello/world`. That is one row doing two things rather than two rows
+      // saying the same name: the caret opens the group, the name opens the
+      // image. A prefix that is not also a repository has nothing to select, so
+      // the whole row toggles.
+      rows.push(
+        folded.leaf
+          ? {
+              key: folded.path,
+              path: folded.path,
+              group: false,
+              label,
+              depth,
+              expandable: true,
+              expanded: open,
+              current: isCurrent(folded.path),
+              onSelect: () => onSelectRepository(folded.path),
+              onToggle: () => onToggleGroup(groupPath),
+            }
+          : {
+              key: groupPath,
+              path: groupPath,
+              group: true,
+              label,
+              depth,
+              expandable: true,
+              expanded: open,
+              current: false,
+              onSelect: () => onToggleGroup(groupPath),
+            },
+      );
+
       if (open) {
-        if (folded.leaf) {
-          rows.push({
-            key: folded.path,
-            path: folded.path,
-            group: false,
-            label: ".",
-            depth: depth + 1,
-            current: isCurrent(folded.path),
-            onSelect: () => onSelectRepository(folded.path),
-          });
-        }
-
         walk(folded, depth + 1);
       }
     }

@@ -33,14 +33,25 @@ export type Row = {
   depth?: number;
   expandable?: boolean;
   expanded?: boolean;
+  /**
+   * Set when the row is both a group and a thing to select: the caret then
+   * toggles and everything else selects. Unset on a plain group, where the
+   * whole row toggles because there is nothing else it could do.
+   */
+  onToggle?: () => void;
 };
 
 /**
- * Where the list is: the row at the top of the viewport, and how much of it is
- * cut off above.
+ * A row, and where its top sits relative to the top of the viewport.
  *
  * Enough to put the same thing back under the same pixel after the rows have
  * been replaced by a different arrangement of the same names.
+ *
+ * `offset` is measured the way you would point at it -- how far down the
+ * viewport the row starts -- so it is slightly negative for a row scrolled
+ * halfway off the top, and positive for anything below. Not "how much is cut
+ * off above", which only means anything for the topmost row and reads as zero,
+ * that is, as "put it at the top", for every other.
  */
 export type Anchor = {
   key: string;
@@ -49,7 +60,7 @@ export type Anchor = {
 
 type Mounted = {
   render: (rows: Row[]) => void;
-  anchor: () => Anchor | undefined;
+  anchor: (key?: string) => Anchor | undefined;
   scrollTo: (anchor: Anchor) => void;
 };
 
@@ -76,9 +87,15 @@ export function renderList(container: HTMLElement, rows: Row[], emptyMessage: st
   state.render(rows);
 }
 
-/** Where the list is, or nothing if it has never been drawn. */
-export function listAnchor(container: HTMLElement): Anchor | undefined {
-  return mounted.get(container)?.anchor();
+/**
+ * Where the list is, or where one particular row is.
+ *
+ * With no key: the row at the top of the viewport. With one: that row, wherever
+ * it happens to be -- which is what holds a row that was clicked in the middle
+ * still, rather than lifting it to the top.
+ */
+export function listAnchor(container: HTMLElement, key?: string): Anchor | undefined {
+  return mounted.get(container)?.anchor(key);
 }
 
 /** Puts `anchor` back where it was. A row that is no longer there is ignored. */
@@ -148,14 +165,17 @@ function mount(container: HTMLElement): Mounted {
       draw(true);
     },
 
-    anchor() {
+    anchor(key?: string) {
       if (current.length === 0) {
         return undefined;
       }
 
-      const index = Math.min(current.length - 1, Math.floor(container.scrollTop / rowHeight));
+      const index =
+        key === undefined
+          ? Math.min(current.length - 1, Math.floor(container.scrollTop / rowHeight))
+          : current.findIndex((row) => row.key === key);
       const row = current[index];
-      return row === undefined ? undefined : { key: row.key, offset: container.scrollTop - index * rowHeight };
+      return row === undefined ? undefined : { key: row.key, offset: index * rowHeight - container.scrollTop };
     },
 
     scrollTo(anchor: Anchor) {
@@ -164,24 +184,48 @@ function mount(container: HTMLElement): Mounted {
         return;
       }
 
-      container.scrollTop = index * rowHeight + anchor.offset;
+      container.scrollTop = index * rowHeight - anchor.offset;
       draw(true);
     },
   };
 }
 
+/** How far one level of nesting indents, and where its guide is drawn. */
+const indent = 14;
+
 function rowElement(row: Row): HTMLElement {
   const button = document.createElement("button");
   button.setAttribute("aria-current", String(row.current));
   button.addEventListener("click", row.onSelect);
-  if (row.depth) {
-    button.style.paddingLeft = `${8 + row.depth * 14}px`;
+
+  const depth = row.depth ?? 0;
+  if (depth > 0) {
+    button.style.paddingLeft = `${8 + depth * indent}px`;
+
+    // One vertical rule per level above this one, so a row shows what it hangs
+    // off. Painted rather than added as elements: a row is a fixed height and
+    // these have to survive being rebuilt on every scroll.
+    button.style.backgroundImage = `repeating-linear-gradient(to right, var(--border-strong) 0 1px, transparent 1px ${indent}px)`;
+    button.style.backgroundRepeat = "no-repeat";
+    button.style.backgroundPosition = `${8 + Math.floor(indent / 2)}px 0`;
+    button.style.backgroundSize = `${depth * indent}px 100%`;
   }
 
   if (row.expandable) {
-    // A caret rather than a disclosure widget: it has to fit in a row that is a
-    // fixed height, and pointing at what it will do is the whole job.
-    button.append(element("span", "caret", row.expanded ? "\u25be" : "\u25b8"));
+    // A caret rather than a disclosure widget: it has to fit in a fixed-height
+    // row, and pointing at what it will do is the whole job.
+    const caret = element("span", "caret", row.expanded ? "\u25be" : "\u25b8");
+    if (row.onToggle !== undefined) {
+      // The row is a repository *and* a prefix. Clicking the name opens the
+      // image; only the caret opens the group.
+      const toggle = row.onToggle;
+      caret.addEventListener("click", (event) => {
+        event.stopPropagation();
+        toggle();
+      });
+    }
+
+    button.append(caret);
   }
 
   button.append(element("span", "name", row.label));

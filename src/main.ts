@@ -1,7 +1,7 @@
 import "./style.css";
 import { listRepositories } from "./catalog";
 import { loadConfig, type PageConfig } from "./config";
-import { listAnchor, renderList, scrollListTo, type Anchor } from "./render/list";
+import { listAnchor, renderList, scrollListTo } from "./render/list";
 import { ancestorsOf, buildTree, flattenTree } from "./render/tree";
 import { listTags } from "./tags";
 import { connect, type Connection, type RegistryClient } from "./registry";
@@ -112,8 +112,12 @@ function renderRepositories(): void {
       (repository) => void selectRepository(repository),
       (path) => {
         // Toggling moves everything below it, and the thing that was clicked is
-        // what the eye is on -- so it, rather than the top row, is held still.
-        const held: Anchor = { key: path, offset: rowOffsetOf(path) };
+        // what the eye is on -- so it is held exactly where it is rather than
+        // the top row being held, which would lift it to the top.
+        //
+        // A group that is also a repository is keyed by its own path, not the
+        // path with the slash, so both are looked for.
+        const held = listAnchor(el.repositoryList, path) ?? listAnchor(el.repositoryList, path.replace(/\/$/, ""));
         if (state.expanded.has(path)) {
           state.expanded.delete(path);
         } else {
@@ -121,17 +125,13 @@ function renderRepositories(): void {
         }
 
         renderRepositories();
-        scrollListTo(el.repositoryList, held);
+        if (held !== undefined) {
+          scrollListTo(el.repositoryList, held);
+        }
       },
     ),
     empty,
   );
-}
-
-/** How far the row for `key` is below the top of the viewport right now. */
-function rowOffsetOf(key: string): number {
-  const anchor = listAnchor(el.repositoryList);
-  return anchor?.key === key ? anchor.offset : 0;
 }
 
 /**
