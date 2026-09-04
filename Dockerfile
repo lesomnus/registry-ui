@@ -21,8 +21,15 @@ COPY tsconfig.json vite.config.ts index.html ./
 COPY src ./src
 RUN npm run build
 
-FROM joseluisq/static-web-server:2.44.0
-COPY --from=build /src/dist /public
+# The alpine variant rather than the scratch one, because the entrypoint needs a
+# shell to turn the environment into config.json. That is the only reason; the
+# server is the same binary.
+FROM joseluisq/static-web-server:2.44.0-alpine
+
+# Owned by the uid the image runs as, so the entrypoint can write config.json
+# into it at startup.
+COPY --from=build --chown=1000:1000 /src/dist /public
+COPY --chown=1000:1000 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # `page-fallback` is what makes a reload of any path land on the app rather than
 # on a 404. There are no routes yet, and there is no reason to notice the day
@@ -33,3 +40,10 @@ ENV SERVER_ROOT=/public \
     SERVER_COMPRESSION=true \
     SERVER_HEALTH=true
 EXPOSE 8080
+
+# What the page starts pointed at. All optional; unset means an empty form.
+#   REGISTRY_DOMAIN     e.g. registry.example, or localhost:5000
+#   REGISTRY_FORWARDER  where the forwarder is, if it is not this origin
+#   REGISTRY_INSECURE   "true" for a registry with no TLS
+#   REGISTRY_DIRECT     "true" for a registry that sends CORS headers
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

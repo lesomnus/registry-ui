@@ -69,6 +69,34 @@ so the forwarder is not in it.
 **`Dockerfile.forwarder`** is the forwarder, for registries that do not send
 CORS headers.
 
+### Pointing the page at a registry
+
+A static build has no configuration of its own, so the container writes one at
+startup from its environment and the page fetches it on load:
+
+```bash
+docker run -p 8080:8080 -e REGISTRY_DOMAIN=registry.example registry-ui
+```
+
+| Variable             |                                                         |
+| -------------------- | ------------------------------------------------------- |
+| `REGISTRY_DOMAIN`    | e.g. `registry.example`, `localhost:5000`               |
+| `REGISTRY_FORWARDER` | where the forwarder is, if it is not this origin        |
+| `REGISTRY_INSECURE`  | `true` for a registry with no TLS                       |
+| `REGISTRY_DIRECT`    | `true` for a registry that sends CORS headers           |
+
+Set a domain and the page opens it by itself rather than asking somebody to
+press a button that was already filled in for them.
+
+These are **defaults**. Someone who types a different registry has that
+remembered in their browser, which also means changing the variable does not
+move somebody who has already typed one — they clear the field or their site
+data. That is the trade for the field being editable at all.
+
+**There is no variable for a password.** A credential in a container's
+environment is a credential in `docker inspect`, in the orchestrator's API and
+in anything that reads either. The page asks for one.
+
 Against a registry that *does* send them — zot, or anything behind an ingress
 that adds them — run the page alone and tick **direct**. There is then nothing
 else to deploy and nothing that can be asked to fetch a URL.

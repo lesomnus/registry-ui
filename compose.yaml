@@ -6,6 +6,13 @@ services:
   page:
     build: .
     ports: ["8080:8080"]
+    environment:
+      # What the form starts filled in with. The page opens it by itself when a
+      # domain is set. A person can type another one, and that sticks in their
+      # browser -- which also means changing this does not move somebody who
+      # already has.
+      REGISTRY_DOMAIN: ""
+      REGISTRY_FORWARDER: "http://localhost:8081/-/fetch"
 
   forwarder:
     build:

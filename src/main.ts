@@ -1,5 +1,6 @@
 import "./style.css";
 import { listRepositories } from "./catalog";
+import { loadConfig, type PageConfig } from "./config";
 import { connect, type Connection, type RegistryClient } from "./registry";
 import { element } from "./render/dom";
 import { renderImage } from "./render/image";
@@ -45,17 +46,28 @@ function saveConnection(connection: Connection): void {
   }
 }
 
-function restoreConnection(): void {
+/**
+ * Fills the form: what the deployment points at, then what the person last used.
+ *
+ * The saved value wins, which is the order that makes both useful -- an operator
+ * says where to start and a person can go somewhere else and have it stick. The
+ * cost is that changing the deployment's default does not move somebody who has
+ * already typed a registry into this browser, which is worth knowing before
+ * wondering why.
+ */
+function fillForm(config: PageConfig): void {
+  let saved: Partial<Connection> = {};
   try {
-    const saved = JSON.parse(localStorage.getItem(remembered) ?? "{}") as Partial<Connection>;
-    el.domain.value = saved.domain ?? "";
-    el.username.value = saved.username ?? "";
-    el.direct.checked = saved.direct === true;
-    el.insecure.checked = saved.insecure === true;
-    el.forwarder.value = saved.forwarder ?? "";
+    saved = JSON.parse(localStorage.getItem(remembered) ?? "{}") as Partial<Connection>;
   } catch {
     // Nothing remembered, which is the same as nothing to restore.
   }
+
+  el.domain.value = saved.domain ?? config.domain ?? "";
+  el.username.value = saved.username ?? "";
+  el.forwarder.value = saved.forwarder ?? config.forwarder ?? "";
+  el.direct.checked = saved.direct ?? config.direct ?? false;
+  el.insecure.checked = saved.insecure ?? config.insecure ?? false;
 }
 
 function renderRepositories(): void {
@@ -219,4 +231,13 @@ el.form.addEventListener("submit", (event) => {
 });
 
 el.filter.addEventListener("input", renderRepositories);
-restoreConnection();
+
+void loadConfig().then((config) => {
+  fillForm(config);
+
+  // A deployment that names a registry means to be opened on it, rather than to
+  // ask the person to press the button that was already filled in for them.
+  if (el.domain.value) {
+    el.form.requestSubmit();
+  }
+});
