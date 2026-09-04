@@ -187,6 +187,13 @@ const server = Bun.serve({
       return await forward(request, target);
     }
 
+    // What this deployment offers, which the page reads on load. It has a
+    // forwarder, so it turns off the direct default -- a page served from a
+    // plain file server has no forwarder to reach and leaves it on.
+    if (url.pathname === "/config.json") {
+      return Response.json({ direct: false });
+    }
+
     if (url.pathname === "/-/health") {
       return new Response("ok\n", { headers: { "content-type": "text/plain; charset=utf-8" } });
     }

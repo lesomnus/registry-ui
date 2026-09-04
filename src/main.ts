@@ -1,6 +1,8 @@
 import "./style.css";
 import { listRepositories } from "./catalog";
 import { loadConfig, type PageConfig } from "./config";
+import { renderList } from "./render/list";
+import { listTags } from "./tags";
 import { connect, type Connection, type RegistryClient } from "./registry";
 import { element } from "./render/dom";
 import { renderImage } from "./render/image";
@@ -66,7 +68,11 @@ function fillForm(config: PageConfig): void {
   el.domain.value = saved.domain ?? config.domain ?? "";
   el.username.value = saved.username ?? "";
   el.forwarder.value = saved.forwarder ?? config.forwarder ?? "";
-  el.direct.checked = saved.direct ?? config.direct ?? false;
+  // On unless told otherwise. A page served from a plain file server -- GitHub
+  // Pages, an S3 bucket -- has no forwarder to reach, so talking to the registry
+  // directly is the only thing that can work there. A deployment that does have
+  // one says so: the bundled server answers /config.json with `direct: false`.
+  el.direct.checked = saved.direct ?? config.direct ?? true;
   el.insecure.checked = saved.insecure ?? config.insecure ?? false;
 }
 
@@ -77,42 +83,30 @@ function renderRepositories(): void {
   el.repositoryCount.textContent =
     shown.length === state.repositories.length ? `${shown.length}` : `${shown.length}/${state.repositories.length}`;
 
-  el.repositoryList.replaceChildren();
-  if (shown.length === 0) {
-    el.repositoryList.append(element("li", "empty", filter ? "Nothing matches." : "No repositories."));
-    return;
-  }
-
-  for (const name of shown) {
-    const button = element("button");
-    button.append(element("span", "name", name));
-    button.setAttribute("aria-current", String(name === state.repository));
-    button.addEventListener("click", () => void selectRepository(name));
-
-    const item = document.createElement("li");
-    item.append(button);
-    el.repositoryList.append(item);
-  }
+  renderList(
+    el.repositoryList,
+    shown.map((name) => ({
+      key: name,
+      label: name,
+      current: name === state.repository,
+      onSelect: () => void selectRepository(name),
+    })),
+    filter ? "Nothing matches." : "No repositories.",
+  );
 }
 
 function renderTags(): void {
   el.tagCount.textContent = `${state.tags.length}`;
-  el.tagList.replaceChildren();
-  if (state.tags.length === 0) {
-    el.tagList.append(element("li", "empty", "No tags."));
-    return;
-  }
-
-  for (const tag of state.tags) {
-    const button = element("button");
-    button.append(element("span", "name", tag));
-    button.setAttribute("aria-current", String(tag === state.tag));
-    button.addEventListener("click", () => void selectTag(tag));
-
-    const item = document.createElement("li");
-    item.append(button);
-    el.tagList.append(item);
-  }
+  renderList(
+    el.tagList,
+    state.tags.map((tag) => ({
+      key: tag,
+      label: tag,
+      current: tag === state.tag,
+      onSelect: () => void selectTag(tag),
+    })),
+    "No tags.",
+  );
 }
 
 async function selectTag(tag: string): Promise<void> {
@@ -152,24 +146,24 @@ async function selectRepository(name: string): Promise<void> {
   const generation = ++state.generation;
 
   renderRepositories();
-  el.tagList.replaceChildren(element("li", "loading", "Loading..."));
+  el.tagList.replaceChildren(element("p", "loading", "Loading..."));
   el.tagCount.textContent = "";
   el.detail.replaceChildren(element("p", "empty", "Pick a tag."));
 
   try {
-    const res = await state.client.repo(name).tags.list({ n: 1000 }).unwrap();
+    const tags = await listTags(state.client, name);
     if (generation !== state.generation) {
       return;
     }
 
-    state.tags = [...(res.tags ?? [])].sort();
+    state.tags = tags.sort();
     renderTags();
   } catch (error) {
     if (generation !== state.generation) {
       return;
     }
 
-    el.tagList.replaceChildren(element("li", "error", String((error as Error).message ?? error)));
+    el.tagList.replaceChildren(element("p", "error", String((error as Error).message ?? error)));
   }
 }
 
@@ -180,8 +174,8 @@ async function open(connection: Connection): Promise<void> {
   state.repository = undefined;
   state.tags = [];
   state.tag = undefined;
-  el.repositoryList.replaceChildren(element("li", "loading", "Loading..."));
-  el.tagList.replaceChildren(element("li", "empty", "Pick a repository."));
+  el.repositoryList.replaceChildren(element("p", "loading", "Loading..."));
+  el.tagList.replaceChildren(element("p", "empty", "Pick a repository."));
   el.detail.replaceChildren(element("p", "empty", "Pick a tag."));
 
   const client = connect(connection);
@@ -209,7 +203,7 @@ async function open(connection: Connection): Promise<void> {
     // if you know their names -- so this is a note rather than a failure.
     el.status.textContent = `${connection.domain} — no repository list: ${String((error as Error).message ?? error)}`;
     el.status.className = "status warn";
-    el.repositoryList.replaceChildren(element("li", "empty", "This registry does not list its repositories."));
+    el.repositoryList.replaceChildren(element("p", "empty", "This registry does not list its repositories."));
   }
 }
 

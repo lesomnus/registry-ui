@@ -167,9 +167,30 @@ It answers preflights, and it lists what a page may read back in
 response whose `Docker-Content-Digest` and `Link` read as absent, and nothing
 errors: pages just stop paginating and digests come out as `-`.
 
-Tick **direct** in the page to skip the forwarder and talk to the registry from
-the browser. Correct for a registry that sends CORS headers, and then nothing
-but the page ever sees the credentials.
+**direct** is on unless a deployment says otherwise: a page on a plain file
+server has no forwarder to reach, so talking to the registry from the browser is
+the only thing that can work there. It is also the better arrangement when it
+works at all -- nothing but the page ever sees the credentials.
+
+A deployment that does have a forwarder says so. The bundled server answers
+`/config.json` with `direct: false`; the container image does the same when
+given `REGISTRY_DIRECT=false`.
+
+## Long lists
+
+Both listings are paged to the end -- `_catalog` and `tags/list` alike. Asking
+for a large `n` is not the same as asking for all of them: a registry may answer
+with fewer and say where the rest are, and taking what comes back drops the
+remainder without saying so.
+
+The lists then only build the rows you can see. A registry with fifty thousand
+tags would otherwise be fifty thousand elements to lay out and keep, paid again
+on every filter and every selection; it builds about two dozen instead, and
+replaces them as you scroll. The scroller is sized as though they were all
+there, so the scrollbar and `Home` and `End` behave.
+
+`rowHeight` in `src/render/list.ts` and the row height in the stylesheet have to
+agree — the window is positioned by multiplying it.
 
 ## How it talks to a registry
 

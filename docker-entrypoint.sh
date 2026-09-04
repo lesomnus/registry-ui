@@ -40,6 +40,16 @@ add_string forwarder "${REGISTRY_FORWARDER:-}"
 add_bool insecure "${REGISTRY_INSECURE:-}"
 add_bool direct "${REGISTRY_DIRECT:-}"
 
+# `direct` defaults to on in the page, so there is nothing to write for the
+# usual case. Turning it *off* has to be written down, which a plain "true"
+# check cannot express.
+case "${REGISTRY_DIRECT:-}" in
+false | FALSE | 0 | no)
+	[ -z "$entries" ] || entries="$entries,"
+	entries="$entries\"direct\":false"
+	;;
+esac
+
 printf '{%s}\n' "$entries" >"$config"
 
 if [ -n "$entries" ]; then

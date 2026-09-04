@@ -186,12 +186,31 @@ input[type="search"]:focus {
   margin: 0;
   padding: 0 8px 12px;
   overflow-y: auto;
-  list-style: none;
+}
+
+/* Sized as though every row were there, so the scrollbar tells the truth. */
+.list-sizer {
+  position: relative;
+}
+
+.list-window {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+
+/*
+ * Rows are a fixed height, and `rowHeight` in render/list.ts is that number.
+ * They have to agree: the window is positioned by multiplying it.
+ */
+.list button {
+  height: 28px;
 }
 
 .list button {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
   width: 100%;
