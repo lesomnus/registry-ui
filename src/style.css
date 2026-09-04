@@ -161,8 +161,33 @@ h2 {
 }
 
 .count {
+  flex: 1;
   font: 11px var(--mono);
   color: var(--text-muted);
+}
+
+.toggle {
+  padding: 2px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font: 11px var(--mono);
+  cursor: pointer;
+}
+
+.toggle[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.caret {
+  flex: none;
+  width: 10px;
+  margin-right: 2px;
+  color: var(--text-muted);
+  font-size: 9px;
 }
 
 input[type="search"] {

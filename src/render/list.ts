@@ -24,14 +24,33 @@ export const rowHeight = 28;
 const overscan = 8;
 
 export type Row = {
+  /** What identifies this row across a redraw, and across a change of view. */
   key: string;
   label: string;
   current: boolean;
   onSelect: () => void;
+  /** How far in to indent it, for a tree. */
+  depth?: number;
+  expandable?: boolean;
+  expanded?: boolean;
+};
+
+/**
+ * Where the list is: the row at the top of the viewport, and how much of it is
+ * cut off above.
+ *
+ * Enough to put the same thing back under the same pixel after the rows have
+ * been replaced by a different arrangement of the same names.
+ */
+export type Anchor = {
+  key: string;
+  offset: number;
 };
 
 type Mounted = {
   render: (rows: Row[]) => void;
+  anchor: () => Anchor | undefined;
+  scrollTo: (anchor: Anchor) => void;
 };
 
 const mounted = new WeakMap<HTMLElement, Mounted>();
@@ -55,6 +74,16 @@ export function renderList(container: HTMLElement, rows: Row[], emptyMessage: st
   }
 
   state.render(rows);
+}
+
+/** Where the list is, or nothing if it has never been drawn. */
+export function listAnchor(container: HTMLElement): Anchor | undefined {
+  return mounted.get(container)?.anchor();
+}
+
+/** Puts `anchor` back where it was. A row that is no longer there is ignored. */
+export function scrollListTo(container: HTMLElement, anchor: Anchor): void {
+  mounted.get(container)?.scrollTo(anchor);
 }
 
 function paragraph(message: string): HTMLElement {
@@ -118,6 +147,26 @@ function mount(container: HTMLElement): Mounted {
 
       draw(true);
     },
+
+    anchor() {
+      if (current.length === 0) {
+        return undefined;
+      }
+
+      const index = Math.min(current.length - 1, Math.floor(container.scrollTop / rowHeight));
+      const row = current[index];
+      return row === undefined ? undefined : { key: row.key, offset: container.scrollTop - index * rowHeight };
+    },
+
+    scrollTo(anchor: Anchor) {
+      const index = current.findIndex((row) => row.key === anchor.key);
+      if (index < 0) {
+        return;
+      }
+
+      container.scrollTop = index * rowHeight + anchor.offset;
+      draw(true);
+    },
   };
 }
 
@@ -125,11 +174,23 @@ function rowElement(row: Row): HTMLElement {
   const button = document.createElement("button");
   button.setAttribute("aria-current", String(row.current));
   button.addEventListener("click", row.onSelect);
+  if (row.depth) {
+    button.style.paddingLeft = `${8 + row.depth * 14}px`;
+  }
 
-  const name = document.createElement("span");
-  name.className = "name";
-  name.textContent = row.label;
-  button.append(name);
+  if (row.expandable) {
+    // A caret rather than a disclosure widget: it has to fit in a row that is a
+    // fixed height, and pointing at what it will do is the whole job.
+    button.append(element("span", "caret", row.expanded ? "\u25be" : "\u25b8"));
+  }
 
+  button.append(element("span", "name", row.label));
   return button;
+}
+
+function element(tag: string, className: string, content: string): HTMLElement {
+  const node = document.createElement(tag);
+  node.className = className;
+  node.textContent = content;
+  return node;
 }

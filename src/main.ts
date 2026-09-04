@@ -1,7 +1,8 @@
 import "./style.css";
 import { listRepositories } from "./catalog";
 import { loadConfig, type PageConfig } from "./config";
-import { renderList } from "./render/list";
+import { listAnchor, renderList, scrollListTo, type Anchor } from "./render/list";
+import { ancestorsOf, buildTree, flattenTree } from "./render/tree";
 import { listTags } from "./tags";
 import { connect, type Connection, type RegistryClient } from "./registry";
 import { element } from "./render/dom";
@@ -19,6 +20,7 @@ const el = {
   repositoryList: document.getElementById("repository-list") as HTMLElement,
   repositoryCount: document.getElementById("repository-count") as HTMLElement,
   filter: document.getElementById("repository-filter") as HTMLInputElement,
+  view: document.getElementById("view-toggle") as HTMLButtonElement,
   tagList: document.getElementById("tag-list") as HTMLElement,
   tagCount: document.getElementById("tag-count") as HTMLElement,
   detail: document.getElementById("detail") as HTMLElement,
@@ -32,7 +34,10 @@ const state: {
   tag?: string;
   /** Bumped on every selection, so a slow answer for an old one is dropped. */
   generation: number;
-} = { repositories: [], tags: [], generation: 0 };
+  tree: boolean;
+  /** Which groups are open, by path. Kept across a switch to the list and back. */
+  expanded: Set<string>;
+} = { repositories: [], tags: [], generation: 0, tree: false, expanded: new Set() };
 
 /** What the last connection was, so a reload does not mean typing it again. */
 const remembered = "registry-ui.connection";
@@ -83,16 +88,87 @@ function renderRepositories(): void {
   el.repositoryCount.textContent =
     shown.length === state.repositories.length ? `${shown.length}` : `${shown.length}/${state.repositories.length}`;
 
+  const empty = filter ? "Nothing matches." : "No repositories.";
+  if (!state.tree) {
+    renderList(
+      el.repositoryList,
+      shown.map((name) => ({
+        key: name,
+        label: name,
+        current: name === state.repository,
+        onSelect: () => void selectRepository(name),
+      })),
+      empty,
+    );
+    return;
+  }
+
   renderList(
     el.repositoryList,
-    shown.map((name) => ({
-      key: name,
-      label: name,
-      current: name === state.repository,
-      onSelect: () => void selectRepository(name),
-    })),
-    filter ? "Nothing matches." : "No repositories.",
+    flattenTree(
+      buildTree(shown),
+      state.expanded,
+      (repository) => repository === state.repository,
+      (repository) => void selectRepository(repository),
+      (path) => {
+        // Toggling moves everything below it, and the thing that was clicked is
+        // what the eye is on -- so it, rather than the top row, is held still.
+        const held: Anchor = { key: path, offset: rowOffsetOf(path) };
+        if (state.expanded.has(path)) {
+          state.expanded.delete(path);
+        } else {
+          state.expanded.add(path);
+        }
+
+        renderRepositories();
+        scrollListTo(el.repositoryList, held);
+      },
+    ),
+    empty,
   );
+}
+
+/** How far the row for `key` is below the top of the viewport right now. */
+function rowOffsetOf(key: string): number {
+  const anchor = listAnchor(el.repositoryList);
+  return anchor?.key === key ? anchor.offset : 0;
+}
+
+/**
+ * Switches between the flat list and the tree, keeping the eye where it was.
+ *
+ * The two views are the same names in a different arrangement, so a switch that
+ * jumps to the top makes somebody find their place again -- which is most of
+ * the reason not to switch. So the row at the top of the viewport is noted, the
+ * view is rebuilt, and that row is put back under the same pixel.
+ *
+ * Going to the tree, the row is a repository whose groups may be closed: they
+ * are opened, or there would be nothing to scroll back to. Going to the list,
+ * the row may be a group, which is not in the list at all -- the first
+ * repository under it stands in, being the thing that was about to be read.
+ */
+function toggleView(): void {
+  const before = listAnchor(el.repositoryList);
+  state.tree = !state.tree;
+  el.view.textContent = state.tree ? "list" : "tree";
+  el.view.setAttribute("aria-pressed", String(state.tree));
+
+  let target = before;
+  if (before !== undefined) {
+    if (state.tree) {
+      for (const group of ancestorsOf(before.key)) {
+        state.expanded.add(group);
+      }
+    } else if (before.key.endsWith("/")) {
+      const first = state.repositories.find((name) => name.startsWith(before.key));
+      target = first === undefined ? undefined : { key: first, offset: before.offset };
+    }
+  }
+
+  renderRepositories();
+  if (target !== undefined) {
+    scrollListTo(el.repositoryList, target);
+  }
 }
 
 function renderTags(): void {
@@ -195,8 +271,24 @@ async function open(connection: Connection): Promise<void> {
   saveConnection(connection);
 
   try {
-    state.repositories = (await listRepositories(client)).sort();
-    el.status.textContent = `${connection.domain}`;
+    // Drawn as the pages arrive. The scroll position is held across each
+    // redraw, so a list growing underneath somebody does not move what they are
+    // reading -- new names arrive below, which is where they belong.
+    await listRepositories(client, (repositories) => {
+      if (state.client !== client) {
+        return;
+      }
+
+      const held = listAnchor(el.repositoryList);
+      state.repositories = [...repositories].sort();
+      el.status.textContent = `${connection.domain} — ${state.repositories.length} repositories`;
+      renderRepositories();
+      if (held !== undefined) {
+        scrollListTo(el.repositoryList, held);
+      }
+    });
+
+    el.status.textContent = `${connection.domain} — ${state.repositories.length} repositories`;
     renderRepositories();
   } catch (error) {
     // A registry that will not list is still one whose images can be opened,
@@ -225,6 +317,7 @@ el.form.addEventListener("submit", (event) => {
 });
 
 el.filter.addEventListener("input", renderRepositories);
+el.view.addEventListener("click", toggleView);
 
 void loadConfig().then((config) => {
   fillForm(config);

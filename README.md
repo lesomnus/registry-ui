@@ -176,12 +176,35 @@ A deployment that does have a forwarder says so. The bundled server answers
 `/config.json` with `direct: false`; the container image does the same when
 given `REGISTRY_DIRECT=false`.
 
+## Two views of the same names
+
+Repository names are paths — `dist/hday/kamino`, `dist/hday/lens` — and a flat
+list of a few hundred of them hides what the shared prefixes mean. **tree**
+draws them once. A run of single-child groups is folded into one row, so
+`dist/external/docker.io/library` is one line rather than four clicks.
+
+**Switching keeps your place.** The row at the top of the viewport is put back
+under the same pixel: going to the tree opens whatever groups have to be open
+for it to exist, and coming back from a group row — which is not in the flat
+list at all — the first repository under it stands in. Expanding a group holds
+the group itself still rather than the top row, since that is the thing being
+looked at.
+
 ## Long lists
 
-Both listings are paged to the end -- `_catalog` and `tags/list` alike. Asking
+Both listings are paged to the end — `_catalog` and `tags/list` alike. Asking
 for a large `n` is not the same as asking for all of them: a registry may answer
 with fewer and say where the rest are, and taking what comes back drops the
 remainder without saying so.
+
+The repository list is **drawn as the pages arrive** rather than after the last
+one, so a registry with a hundred pages shows the first immediately. Each redraw
+holds the scroll position, so a list growing underneath you does not move what
+you are reading — new names arrive below, which is where they belong.
+
+It is not infinite scroll: the pages are fetched as fast as the registry answers
+rather than when you reach the bottom. The scrollbar is honest about what has
+arrived, and grows.
 
 The lists then only build the rows you can see. A registry with fifty thousand
 tags would otherwise be fifty thousand elements to lay out and keep, paid again

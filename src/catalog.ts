@@ -11,8 +11,18 @@ import type { RegistryClient } from "./registry";
  * because the two are not always the same thing: a registry deriving
  * repositories from object keys hands back a key.
  */
-export async function listRepositories(client: RegistryClient, pageSize = 500, maxPages = 100): Promise<string[]> {
-  const collected: string[] = [];
+/**
+ * @param onPage called with everything collected so far, each time a page
+ * arrives, so a registry with a hundred pages shows the first one immediately
+ * rather than a spinner until the last.
+ */
+export async function listRepositories(
+  client: RegistryClient,
+  onPage?: (repositories: string[]) => void,
+  pageSize = 500,
+  maxPages = 100,
+): Promise<string[]> {
+  const collected = new Set<string>();
   let last: string | undefined;
 
   for (let page = 0; page < maxPages; page++) {
@@ -22,7 +32,11 @@ export async function listRepositories(client: RegistryClient, pageSize = 500, m
       break;
     }
 
-    collected.push(...repositories);
+    for (const repository of repositories) {
+      collected.add(repository);
+    }
+
+    onPage?.([...collected]);
 
     last = nextCursor(res.raw);
     if (last === undefined) {
@@ -30,7 +44,7 @@ export async function listRepositories(client: RegistryClient, pageSize = 500, m
     }
   }
 
-  return [...new Set(collected)];
+  return [...collected];
 }
 
 /** The `last` a `rel="next"` link asks to be given back. */

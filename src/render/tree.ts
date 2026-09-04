@@ -1,0 +1,146 @@
+import type { Row } from "./list";
+
+/**
+ * Repository names as a tree, since that is what they are.
+ *
+ * `dist/hday/kamino` and `dist/hday/lens` share a prefix that means something --
+ * a namespace, a team, a stage -- and a flat list of a few hundred of them
+ * hides it. The tree is the same names with the shared parts drawn once.
+ *
+ * A group's key ends in `/` and a repository's does not, which is what tells
+ * them apart and what lets a row in one view be found in the other.
+ */
+
+export type TreeRow = Row & {
+  /** The full path: `dist/hday/` for a group, `dist/hday/kamino` for a repository. */
+  path: string;
+  group: boolean;
+};
+
+type Node = {
+  segment: string;
+  path: string;
+  children: Map<string, Node>;
+  /** Set when a repository is named by exactly this path. */
+  leaf: boolean;
+};
+
+function emptyNode(segment: string, path: string): Node {
+  return { segment, path, children: new Map(), leaf: false };
+}
+
+/**
+ * Builds the tree.
+ *
+ * A name can be both a repository and a prefix -- `hello` next to
+ * `hello/world` -- so a node carries `leaf` rather than being decided by
+ * whether it has children.
+ */
+export function buildTree(names: string[]): Node {
+  const root = emptyNode("", "");
+  for (const name of names) {
+    let node = root;
+    const segments = name.split("/").filter((segment) => segment !== "");
+    for (const [index, segment] of segments.entries()) {
+      const path = segments.slice(0, index + 1).join("/");
+      let child = node.children.get(segment);
+      if (child === undefined) {
+        child = emptyNode(segment, path);
+        node.children.set(segment, child);
+      }
+
+      node = child;
+    }
+
+    node.leaf = true;
+  }
+
+  return root;
+}
+
+/**
+ * The rows a tree shows, in order, given what is expanded.
+ *
+ * A group with one child and nothing of its own is folded into its child --
+ * `dist/external/docker.io/library` is four clicks to say one thing otherwise.
+ * The label carries the whole run and the path stays exact.
+ */
+export function flattenTree(
+  root: Node,
+  expanded: Set<string>,
+  isCurrent: (repository: string) => boolean,
+  onSelectRepository: (repository: string) => void,
+  onToggleGroup: (path: string) => void,
+): TreeRow[] {
+  const rows: TreeRow[] = [];
+
+  const walk = (node: Node, depth: number) => {
+    for (const child of [...node.children.values()].sort((a, b) => a.segment.localeCompare(b.segment))) {
+      let folded = child;
+      let label = child.segment;
+      while (!folded.leaf && folded.children.size === 1) {
+        const [only] = folded.children.values();
+        if (only === undefined) {
+          break;
+        }
+
+        folded = only;
+        label = `${label}/${only.segment}`;
+      }
+
+      if (folded.children.size === 0) {
+        rows.push({
+          key: folded.path,
+          path: folded.path,
+          group: false,
+          label,
+          depth,
+          current: isCurrent(folded.path),
+          onSelect: () => onSelectRepository(folded.path),
+        });
+        continue;
+      }
+
+      const groupPath = `${folded.path}/`;
+      const open = expanded.has(groupPath);
+      rows.push({
+        key: groupPath,
+        path: groupPath,
+        group: true,
+        label,
+        depth,
+        expandable: true,
+        expanded: open,
+        current: false,
+        onSelect: () => onToggleGroup(groupPath),
+      });
+
+      // A path that is both a repository and a prefix appears twice on purpose:
+      // once as the group holding what is under it, once as the thing itself.
+      if (open) {
+        if (folded.leaf) {
+          rows.push({
+            key: folded.path,
+            path: folded.path,
+            group: false,
+            label: ".",
+            depth: depth + 1,
+            current: isCurrent(folded.path),
+            onSelect: () => onSelectRepository(folded.path),
+          });
+        }
+
+        walk(folded, depth + 1);
+      }
+    }
+  };
+
+  walk(root, 0);
+  return rows;
+}
+
+/** Every group that has to be open for `repository` to be a row. */
+export function ancestorsOf(repository: string): string[] {
+  const segments = repository.split("/").filter((segment) => segment !== "");
+  return segments.slice(0, -1).map((_, index) => `${segments.slice(0, index + 1).join("/")}/`);
+}
