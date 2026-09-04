@@ -93,15 +93,26 @@ transport underneath its authorizer catches the registry and the token endpoint
 both, and neither of them knows it is being forwarded. A URL prefix applied
 where the registry URL is built would catch only the first.
 
-Two things the page does not go through the client for:
+Credentials go to the authorizer rather than onto every request, which is not a
+detail: it waits for the challenge, answers `basic` by sending the credential
+and `bearer` by spending it at the token endpoint the challenge names, and
+remembers the result. Attaching them to every request instead would send them to
+hosts that never asked, the token endpoint among them, which wants them
+somewhere else.
 
-- **`_catalog`** is paged with `n` and `last` and says where the next page is in
-  a `Link` header. oci-client's catalog extension asks for it in one request, so
-  `src/catalog.ts` borrows `client.transport` and follows the pages itself —
-  which still gets authentication and forwarding for free.
-- **Blobs** are read with `raw.json()`, because `blobs.get()` deliberately
-  leaves the body unread. Manifests are not: `unwrap()` has already read those,
-  and the result *is* the manifest.
+A registry with no referrers API is handled inside the client, by the referrers
+tag schema. This page does not know which kind it is talking to.
+
+One thing worth knowing when reading the code: **blobs are read with
+`raw.json()` and manifests are not.** `blobs.get()` leaves the body unread on
+purpose; `unwrap()` has already read a manifest, and the result *is* the
+manifest, so asking again throws.
+
+## Installing it
+
+oci-client comes from git rather than npm — npm still has 0.0.1 from 2024, and
+the credential support, the referrers fallback and the paged catalog this uses
+are all newer. `npm install` builds it, through the package's `prepare`.
 
 ## Layout
 
