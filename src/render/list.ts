@@ -33,6 +33,12 @@ export type Row = {
   depth?: number;
   expandable?: boolean;
   expanded?: boolean;
+  /** What the row is, which decides its icon. */
+  kind?: "repository" | "group";
+  /** Ranges of `label` that matched what was typed, drawn picked out. */
+  matches?: [number, number][];
+  /** Said quietly beside the label: where a row came from, mostly. */
+  note?: string;
   /**
    * Set when the row is both a group and a thing to select: the caret then
    * toggles and everything else selects. Unset on a plain group, where the
@@ -228,8 +234,74 @@ function rowElement(row: Row): HTMLElement {
     button.append(caret);
   }
 
-  button.append(element("span", "name", row.label));
+  if (row.kind !== undefined) {
+    button.append(icon(row.kind));
+  }
+
+  button.append(labelElement(row.label, row.matches));
+  if (row.note !== undefined) {
+    button.append(element("span", "note", row.note));
+  }
+
   return button;
+}
+
+/**
+ * The label, with what was searched for picked out of it.
+ *
+ * Built as spans rather than by setting innerHTML: the text is a repository
+ * name from a registry, and the one thing that must not happen is a name being
+ * read as markup.
+ */
+function labelElement(label: string, matches?: [number, number][]): HTMLElement {
+  const name = document.createElement("span");
+  name.className = "name";
+
+  if (matches === undefined || matches.length === 0) {
+    name.textContent = label;
+    return name;
+  }
+
+  let at = 0;
+  for (const [from, to] of matches) {
+    if (from > at) {
+      name.append(document.createTextNode(label.slice(at, from)));
+    }
+
+    name.append(element("mark", "hit", label.slice(from, to)));
+    at = to;
+  }
+
+  if (at < label.length) {
+    name.append(document.createTextNode(label.slice(at)));
+  }
+
+  return name;
+}
+
+/**
+ * A folder or an image.
+ *
+ * Inline rather than a font or a sprite: two shapes, drawn in `currentColor` so
+ * they follow the row, and nothing to load.
+ */
+function icon(kind: "repository" | "group"): SVGSVGElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "icon");
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("aria-hidden", "true");
+
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute(
+    "d",
+    kind === "group"
+      ? // A folder.
+        "M1.75 3h3.9a1 1 0 0 1 .7.3L7.6 4.5h6.65a.75.75 0 0 1 .75.75v7A1.75 1.75 0 0 1 13.25 14H2.75A1.75 1.75 0 0 1 1 12.25V3.75A.75.75 0 0 1 1.75 3Z"
+      : // A box, seen from above: what an image is drawn as everywhere else.
+        "M8 1.2 14.4 4.6v6.8L8 14.8 1.6 11.4V4.6Zm0 1.7L3.6 5.2 8 7.5l4.4-2.3Zm-5 3.6v4.2l4.25 2.25V9.1Zm10 0L8.75 9.1v3.85L13 10.7Z",
+  );
+  svg.append(path);
+  return svg;
 }
 
 function element(tag: string, className: string, content: string): HTMLElement {

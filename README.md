@@ -190,6 +190,26 @@ list at all — the first repository under it stands in. Expanding a group holds
 the group exactly where it is on screen rather than the top row, since that is
 the thing being looked at.
 
+## Filtering, and asking the registry
+
+Typing filters what is already loaded, instantly, and picks the matching text
+out of every name — every occurrence, since a name is a path and the same word
+often appears in more than one segment.
+
+Behind that, the registry is asked too. Searching is not in the distribution
+spec, so there is no one endpoint: zot serves GraphQL, Docker Hub and friends
+serve `/v1/search`, and plenty serve neither. oci-client has both shapes behind
+one interface; which one a registry answers is found out by trying, once, and
+remembered — including "neither", so a registry that cannot search is not asked
+again on every keystroke.
+
+Results the local list does not have are marked **found** and **appended**
+rather than merged in by rank. What is already on screen stays where it is: an
+answer arriving must not move what somebody is reading.
+
+This matters most where there is no list at all. Docker Hub serves no
+`_catalog`, so browsing it is search or nothing.
+
 ## Long lists
 
 Both listings are paged to the end — `_catalog` and `tags/list` alike. Asking

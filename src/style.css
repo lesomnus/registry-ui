@@ -448,3 +448,31 @@ a.external {
   color: var(--accent);
   font-size: 12px;
 }
+
+/* A folder or an image, drawn in the row's own colour. */
+.icon {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  margin-right: 5px;
+  fill: currentColor;
+  opacity: 0.55;
+}
+
+.list button[aria-current="true"] .icon {
+  opacity: 1;
+}
+
+/* What was searched for, picked out of the name. */
+.hit {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: inherit;
+  border-radius: 2px;
+}
+
+.note {
+  flex: none;
+  margin-left: 6px;
+  color: var(--text-muted);
+  font: 10px var(--mono);
+}

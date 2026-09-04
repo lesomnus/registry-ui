@@ -1,5 +1,7 @@
 import type { RegistryClient } from "../registry";
+import { sbom, vnd } from "@lesomnus/oci-client/media-types";
 import { base64ToBytes, readFulcioIdentity } from "../certificate";
+import { sigstoreBundle } from "../media-types";
 import { definitions, element, externalLink, formatSize, shortDigest, table } from "./dom";
 
 /** A descriptor as it appears in a referrers listing. */
@@ -25,16 +27,21 @@ type Manifest = {
  * The question asked of a registry browser is whether a thing is signed, not
  * which media type says so -- so a sigstore bundle and a notation envelope are
  * both "Signature", with the scheme after it.
+ *
+ * The strings come from oci-client where it names them, which is everything
+ * here except the sigstore bundle.
  */
 const artifactNames: Record<string, string> = {
-  "application/vnd.dev.sigstore.bundle.v0.3+json": "Signature (sigstore)",
-  "application/vnd.dev.sigstore.bundle+json": "Signature (sigstore)",
-  "application/vnd.dev.cosign.simplesigning.v1+json": "Signature (cosign)",
-  "application/vnd.cncf.notary.signature": "Signature (notation)",
-  "application/vnd.in-toto+json": "Attestation (in-toto)",
+  [sigstoreBundle.v03]: "Signature (sigstore)",
+  [sigstoreBundle.any]: "Signature (sigstore)",
+  [vnd.dev.cosign.simpleSigningV1]: "Signature (cosign)",
+  [vnd.cncf.notary.signature]: "Signature (notation)",
+  [vnd.inToto.statement]: "Attestation (in-toto)",
+  [vnd.inToto.provenance]: "Attestation (provenance)",
+  [vnd.inToto.spdx]: "SBOM (SPDX, in-toto)",
+  [sbom.spdx.json]: "SBOM (SPDX)",
+  [sbom.cyclonedx.json]: "SBOM (CycloneDX)",
   "application/vnd.docker.attestation.manifest.v1+json": "Attestation (buildkit)",
-  "application/spdx+json": "SBOM (SPDX)",
-  "application/vnd.cyclonedx+json": "SBOM (CycloneDX)",
 };
 
 export const typeOf = (descriptor: Descriptor): string => descriptor.artifactType ?? descriptor.mediaType ?? "";
@@ -42,11 +49,11 @@ export const typeOf = (descriptor: Descriptor): string => descriptor.artifactTyp
 export const artifactName = (descriptor: Descriptor): string => artifactNames[typeOf(descriptor)] ?? typeOf(descriptor) ?? "-";
 
 /** The types this page calls a signature, which is what the badge counts. */
-const signatureTypes = new Set([
-  "application/vnd.dev.sigstore.bundle.v0.3+json",
-  "application/vnd.dev.sigstore.bundle+json",
-  "application/vnd.dev.cosign.simplesigning.v1+json",
-  "application/vnd.cncf.notary.signature",
+const signatureTypes = new Set<string>([
+  sigstoreBundle.v03,
+  sigstoreBundle.any,
+  vnd.dev.cosign.simpleSigningV1,
+  vnd.cncf.notary.signature,
 ]);
 
 export const isSignature = (descriptor: Descriptor): boolean => signatureTypes.has(typeOf(descriptor));
@@ -66,9 +73,9 @@ type Renderer = (client: RegistryClient, repository: string, manifest: Manifest)
  * should cost the detail rather than the page.
  */
 export const artifactRenderers: Record<string, Renderer> = {
-  "application/vnd.dev.sigstore.bundle.v0.3+json": renderSigstore,
-  "application/vnd.dev.sigstore.bundle+json": renderSigstore,
-  "application/vnd.cncf.notary.signature": renderNotation,
+  [sigstoreBundle.v03]: renderSigstore,
+  [sigstoreBundle.any]: renderSigstore,
+  [vnd.cncf.notary.signature]: renderNotation,
 };
 
 /** A blob, which unlike a manifest is left unread by the client for us to parse. */

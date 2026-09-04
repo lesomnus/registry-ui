@@ -1,5 +1,5 @@
 import { Accept, ClientV2, TransportAuthorizer, Unsecure, ext } from "@lesomnus/oci-client";
-import type { Transport, TransportMiddleware } from "@lesomnus/oci-client";
+import type { ClientInit, Transport, TransportMiddleware } from "@lesomnus/oci-client";
 import { manifestMediaTypes } from "./media-types";
 import { DirectTransport, ProxyTransport } from "./transport";
 
@@ -36,7 +36,15 @@ export type Connection = {
  * password field -- which is how `docker login` sends a token and therefore how
  * every registry has learned to accept one.
  */
-export function connect(connection: Connection): RegistryClient {
+/**
+ * How to reach this registry: the domain, and the chain every request runs
+ * through.
+ *
+ * Built once and shared, so the client that browses and the client that
+ * searches are the same connection -- one authorizer, so a token obtained by
+ * one is not obtained again by the other.
+ */
+export function connectionOf(connection: Connection): [string, ClientInit] {
   const wire = connection.direct ? new DirectTransport() : new ProxyTransport(connection.forwarder);
   const credential =
     connection.username && connection.password
@@ -56,5 +64,10 @@ export function connect(connection: Connection): RegistryClient {
     ? [accept, authorizer, new Unsecure(), wire]
     : [accept, authorizer, wire];
 
-  return new Client(connection.domain, { transport });
+  return [connection.domain, { transport }];
+}
+
+export function connect(connection: Connection): RegistryClient {
+  const [domain, init] = connectionOf(connection);
+  return new Client(domain, init);
 }

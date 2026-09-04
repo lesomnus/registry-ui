@@ -4,7 +4,8 @@ import { loadConfig, type PageConfig } from "./config";
 import { listAnchor, renderList, scrollListTo } from "./render/list";
 import { ancestorsOf, buildTree, flattenTree } from "./render/tree";
 import { listTags } from "./tags";
-import { connect, type Connection, type RegistryClient } from "./registry";
+import { connect, connectionOf, type Connection, type RegistryClient } from "./registry";
+import { Search, type RepoSummary } from "./search";
 import { element } from "./render/dom";
 import { renderImage } from "./render/image";
 
@@ -37,7 +38,41 @@ const state: {
   tree: boolean;
   /** Which groups are open, by path. Kept across a switch to the list and back. */
   expanded: Set<string>;
-} = { repositories: [], tags: [], generation: 0, tree: false, expanded: new Set() };
+  search?: Search;
+  /** What the registry answered for the current query, by name. */
+  found: Map<string, RepoSummary>;
+  /** The query those results are for, so a stale answer can be recognised. */
+  foundFor: string;
+} = { repositories: [], tags: [], generation: 0, tree: false, expanded: new Set(), found: new Map(), foundFor: "" };
+
+/**
+ * Where every occurrence of `needle` is in `haystack`, case-insensitively.
+ *
+ * Every occurrence rather than the first, because a name is a path and the
+ * thing typed is often in more than one of its segments.
+ */
+function matchesIn(haystack: string, needle: string): [number, number][] {
+  if (needle === "") {
+    return [];
+  }
+
+  const ranges: [number, number][] = [];
+  const lower = haystack.toLowerCase();
+  const target = needle.toLowerCase();
+  let at = lower.indexOf(target);
+  while (at >= 0) {
+    ranges.push([at, at + target.length]);
+    at = lower.indexOf(target, at + target.length);
+  }
+
+  return ranges;
+}
+
+/**
+ * Ranges of a tree row's label, whose label is a run of path segments rather
+ * than the whole name -- so the offsets have to be found in the label itself.
+ */
+const labelMatches = (label: string, filter: string): [number, number][] => matchesIn(label, filter);
 
 /** What the last connection was, so a reload does not mean typing it again. */
 const remembered = "registry-ui.connection";
@@ -82,8 +117,18 @@ function fillForm(config: PageConfig): void {
 }
 
 function renderRepositories(): void {
-  const filter = el.filter.value.trim().toLowerCase();
-  const shown = filter ? state.repositories.filter((name) => name.toLowerCase().includes(filter)) : state.repositories;
+  const filter = el.filter.value.trim();
+  const lower = filter.toLowerCase();
+  const local = filter ? state.repositories.filter((name) => name.toLowerCase().includes(lower)) : state.repositories;
+
+  // What the registry found and this browser does not have. Appended rather
+  // than merged in order: the local matches are already on screen, and an
+  // answer arriving must not move what somebody is reading.
+  const known = new Set(state.repositories);
+  const remoteOnly =
+    filter && state.foundFor === filter ? [...state.found.keys()].filter((name) => !known.has(name)).sort() : [];
+
+  const shown = [...local, ...remoteOnly];
 
   el.repositoryCount.textContent =
     shown.length === state.repositories.length ? `${shown.length}` : `${shown.length}/${state.repositories.length}`;
@@ -95,6 +140,9 @@ function renderRepositories(): void {
       shown.map((name) => ({
         key: name,
         label: name,
+        kind: "repository" as const,
+        matches: matchesIn(name, filter),
+        note: known.has(name) ? undefined : "found",
         current: name === state.repository,
         onSelect: () => void selectRepository(name),
       })),
@@ -108,6 +156,7 @@ function renderRepositories(): void {
     flattenTree(
       buildTree(shown),
       state.expanded,
+      (label) => labelMatches(label, filter),
       (repository) => repository === state.repository,
       (repository) => void selectRepository(repository),
       (path) => {
@@ -254,8 +303,12 @@ async function open(connection: Connection): Promise<void> {
   el.tagList.replaceChildren(element("p", "empty", "Pick a repository."));
   el.detail.replaceChildren(element("p", "empty", "Pick a tag."));
 
+  const [domain, init] = connectionOf(connection);
   const client = connect(connection);
   state.client = client;
+  state.search = new Search(domain, init);
+  state.found = new Map();
+  state.foundFor = "";
 
   try {
     // The version probe first: it is the one call whose failure means "this is
@@ -316,7 +369,59 @@ el.form.addEventListener("submit", (event) => {
   });
 });
 
-el.filter.addEventListener("input", renderRepositories);
+/**
+ * Asks the registry what the local list may not have.
+ *
+ * The local filter runs on every keystroke and is instant, because the names
+ * are already here. This runs behind it: debounced, because a keystroke is not
+ * a question, and only when the registry has been found to answer at all.
+ *
+ * Its results are appended rather than merged in, so an answer arriving does
+ * not move what is already on screen. Anything the local list already has is
+ * dropped -- the same name twice, once marked "found", would be a worse answer
+ * than either.
+ */
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+
+function onFilterInput(): void {
+  renderRepositories();
+
+  const query = el.filter.value.trim();
+  if (searchTimer !== undefined) {
+    clearTimeout(searchTimer);
+  }
+
+  if (query === "" || state.search === undefined) {
+    state.found = new Map();
+    state.foundFor = "";
+    return;
+  }
+
+  searchTimer = setTimeout(() => {
+    const search = state.search;
+    if (search === undefined) {
+      return;
+    }
+
+    void search.find(query).then(({ repositories }) => {
+      // The query may have moved on while this was in flight.
+      if (el.filter.value.trim() !== query) {
+        return;
+      }
+
+      state.found = new Map(repositories.map((repository) => [repository.name, repository]));
+      state.foundFor = query;
+
+      const held = listAnchor(el.repositoryList);
+      renderRepositories();
+      if (held !== undefined) {
+        scrollListTo(el.repositoryList, held);
+      }
+    });
+  }, 250);
+}
+
+el.filter.addEventListener("input", onFilterInput);
 el.view.addEventListener("click", toggleView);
 
 void loadConfig().then((config) => {
