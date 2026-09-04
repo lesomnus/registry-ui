@@ -1,0 +1,397 @@
+/*
+ * One accent, one neutral ramp, and a monospace face for anything that is a
+ * digest or a size. Everything a registry has to say is either an identifier or
+ * a number, and both read better when the columns line up.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --bg: #ffffff;
+  --bg-sunken: #f6f7f9;
+  --bg-raised: #ffffff;
+  --border: #e3e6ea;
+  --border-strong: #cdd3da;
+  --text: #14181d;
+  --text-muted: #616b76;
+  --accent: #2f6feb;
+  --accent-soft: #e8f0fe;
+  --ok: #1a7f4b;
+  --warn: #9a6700;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101317;
+    --bg-sunken: #0b0d10;
+    --bg-raised: #171b21;
+    --border: #262c34;
+    --border-strong: #39424d;
+    --text: #e6eaef;
+    --text-muted: #8b96a3;
+    --accent: #6da2ff;
+    --accent-soft: #1b2739;
+    --ok: #4ec98a;
+    --warn: #d9a441;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-sunken);
+  color: var(--text);
+  font:
+    14px/1.5 ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+}
+
+header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+#connection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+#connection input[type="text"],
+#connection input[type="password"] {
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+#domain {
+  flex: 1 1 260px;
+  min-width: 200px;
+  font-family: var(--mono);
+}
+
+#connection button[type="submit"] {
+  padding: 7px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.direct {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.status {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: var(--mono);
+}
+
+.status.error {
+  color: var(--warn);
+}
+
+.status.warn {
+  color: var(--warn);
+}
+
+
+
+
+main {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(200px, 1fr) minmax(340px, 2fr);
+  gap: 1px;
+  background: var(--border);
+  height: calc(100vh - 96px);
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.pane-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px 8px;
+}
+
+h2 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.count {
+  font: 11px var(--mono);
+  color: var(--text-muted);
+}
+
+input[type="search"] {
+  margin: 0 12px 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+input[type="search"]:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.list {
+  flex: 1;
+  margin: 0;
+  padding: 0 8px 12px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.list button {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.list button:hover {
+  background: var(--bg-sunken);
+}
+
+.list button[aria-current="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.list .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list .meta {
+  flex: none;
+  font: 11px var(--mono);
+  color: var(--text-muted);
+}
+
+.empty,
+.error {
+  padding: 8px 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.error {
+  color: var(--warn);
+}
+
+.detail #detail {
+  flex: 1;
+  padding: 4px 20px 24px;
+  overflow-y: auto;
+}
+
+
+
+
+
+dl {
+  display: grid;
+  grid-template-columns: 132px 1fr;
+  gap: 6px 16px;
+  margin: 0 0 20px;
+}
+
+dt {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+dd {
+  margin: 0;
+  font: 12px var(--mono);
+  overflow-wrap: anywhere;
+}
+
+h3 {
+  margin: 20px 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 12px var(--mono);
+}
+
+th {
+  padding: 4px 8px 4px 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-weight: 500;
+  text-align: left;
+}
+
+td {
+  padding: 4px 8px 4px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+
+td.numeric,
+th.numeric {
+  text-align: right;
+  padding-right: 0;
+}
+
+.badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: 11px var(--mono);
+}
+
+.loading {
+  padding: 8px 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  main {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .list {
+    max-height: 260px;
+  }
+}
+
+/* Whether the image is signed, said before anything else about it. */
+.signed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -8px 0 16px;
+  min-height: 20px;
+}
+
+.badge-signed,
+.badge-unsigned {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font: 11px var(--mono);
+  font-weight: 500;
+}
+
+.badge-signed {
+  background: color-mix(in srgb, var(--ok) 15%, transparent);
+  color: var(--ok);
+}
+
+.badge-unsigned {
+  background: var(--bg-sunken);
+  color: var(--text-muted);
+}
+
+.signed .meta {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* A type in the Attached table is a handle, not a label. */
+.linklike {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.linklike:hover {
+  text-decoration: underline;
+}
+
+.artifact-detail:empty {
+  display: none;
+}
+
+.panel {
+  margin: 12px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-sunken);
+}
+
+.panel h3:first-child {
+  margin-top: 0;
+}
+
+.panel dl {
+  margin-bottom: 0;
+}
+
+a.external {
+  display: inline-block;
+  margin-top: 10px;
+  color: var(--accent);
+  font-size: 12px;
+}

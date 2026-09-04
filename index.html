@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Registry UI</title>
+  </head>
+  <body>
+    <header>
+      <form id="connection">
+        <input id="domain" type="text" placeholder="registry.example, or localhost:5000" autocomplete="off" spellcheck="false" />
+        <input id="username" type="text" placeholder="username" autocomplete="username" />
+        <input id="password" type="password" placeholder="password or token" autocomplete="current-password" />
+        <label class="direct"><input id="direct" type="checkbox" /> direct</label>
+        <button type="submit">Open</button>
+      </form>
+      <p id="status" class="status">Enter a registry.</p>
+    </header>
+
+    <main>
+      <section class="pane">
+        <div class="pane-head">
+          <h2>Repositories</h2>
+          <span class="count" id="repository-count"></span>
+        </div>
+        <input id="repository-filter" type="search" placeholder="Filter repositories" autocomplete="off" />
+        <ul class="list" id="repository-list">
+          <li class="empty">Not connected.</li>
+        </ul>
+      </section>
+
+      <section class="pane">
+        <div class="pane-head">
+          <h2>Tags</h2>
+          <span class="count" id="tag-count"></span>
+        </div>
+        <ul class="list" id="tag-list">
+          <li class="empty">Pick a repository.</li>
+        </ul>
+      </section>
+
+      <section class="pane detail">
+        <div class="pane-head"><h2>Image</h2></div>
+        <div id="detail"><p class="empty">Pick a tag.</p></div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
