@@ -1,0 +1,57 @@
+# Publishes the page to GitHub Pages.
+#
+# Only the page: Pages serves files and runs nothing, so there is no forwarder
+# here. A registry that sends CORS headers is browsed by ticking "direct"; one
+# that does not needs a forwarder somewhere, whose URL is typed into the page.
+#
+# Pages is HTTPS, so anything the page talks to has to be too -- a browser
+# refuses an http registry or forwarder from an https page as mixed content.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+# One deploy at a time, and let a newer one win: an older build finishing later
+# would otherwise publish over it.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # `npm ci` honours the lockfile, which pins oci-client to a commit; the
+      # package builds itself through its `prepare` on install.
+      - run: npm ci
+      - run: npm run build
+
+      # Deployed with whatever `config.json` is in the repository, and with none
+      # if there is none -- the page then opens with an empty form, which is the
+      # right default for a page anybody can load.
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

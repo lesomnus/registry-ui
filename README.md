@@ -107,6 +107,27 @@ forwarder's URL is typed into the page, which keeps the image free of runtime
 configuration: the same static build works wherever it is served from, including
 somewhere that is not a server at all.
 
+### GitHub Pages, or any static host
+
+The build is relative — assets are referenced as `./assets/…` — so it works at
+the root of a host, in a subdirectory, or on a Pages project site at
+`/<repo>/`. `.github/workflows/pages.yaml` publishes it.
+
+Two things do not come with it:
+
+- **No forwarder.** Pages serves files and runs nothing. So either the registry
+  sends CORS headers and you tick **direct**, or you point the page at a
+  forwarder you run somewhere.
+- **No `config.json` from the environment**, since there is no container to
+  write one. Commit one next to `index.html` if the deployment should start
+  somewhere; without one the form opens empty, which is the right default for a
+  page anybody can load.
+
+And one thing to know: **Pages is HTTPS, so whatever the page talks to must be
+too.** A browser refuses an `http://` registry or forwarder from an `https://`
+page as mixed content, which rules out the **http** tick and a registry on your
+own machine.
+
 ## Why there is a server
 
 A registry answers `fetch` from a page only if it sends
