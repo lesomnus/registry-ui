@@ -187,8 +187,8 @@ draws them once. A run of single-child groups is folded into one row, so
 under the same pixel: going to the tree opens whatever groups have to be open
 for it to exist, and coming back from a group row — which is not in the flat
 list at all — the first repository under it stands in. Expanding a group holds
-the group itself still rather than the top row, since that is the thing being
-looked at.
+the group exactly where it is on screen rather than the top row, since that is
+the thing being looked at.
 
 ## Long lists
 
