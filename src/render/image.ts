@@ -3,6 +3,7 @@ import type { RegistryClient } from "../registry";
 import type { Descriptor } from "./artifact";
 import { artifactName, isSignature, openArtifact } from "./artifact";
 import type { Cell } from "./dom";
+import { readManifest } from "../manifest";
 import { definitions, element, formatSize, shortDigest, table } from "./dom";
 
 type Child = { digest: string; mediaType?: string; platform?: { os?: string; architecture?: string; variant?: string } };
@@ -106,14 +107,23 @@ function attachedSection(client: RegistryClient, repository: string, attachments
 export async function renderImage(client: RegistryClient, repository: string, reference: string): Promise<Node> {
   // `unwrap()` has already read the body, and the result *is* the manifest with
   // `raw` and `as()` laid over it. Asking `raw.json()` again throws.
-  const res = await client.repo(repository).manifests.get(reference).unwrap();
-  const digest = res.raw.headers.get("Docker-Content-Digest") ?? "-";
-  const mediaType = res.raw.headers.get("Content-Type") ?? "-";
-  const manifest = res as unknown as Manifest;
+  // Read for its bytes, so the digest is computed rather than taken on trust --
+  // a browser usually cannot read `Docker-Content-Digest` at all. See manifest.ts.
+  const read = await readManifest(client, repository, reference);
+  const { digest, mediaType, mismatch } = read;
+  const manifest = read.manifest as Manifest;
 
   const fragment = document.createDocumentFragment();
   const badge = element("div", "signed");
   fragment.append(badge);
+
+  // The registry named a digest its own bytes do not have. Not this page's
+  // problem to solve, and very much its problem to mention.
+  if (mismatch !== undefined) {
+    fragment.append(
+      element("p", "error", `the registry reports ${shortDigest(mismatch)} for these bytes, which hash to ${shortDigest(digest)}`),
+    );
+  }
 
   if (indexMediaTypes.has(mediaType)) {
     const children = manifest.manifests ?? [];
@@ -130,10 +140,7 @@ export async function renderImage(client: RegistryClient, repository: string, re
     const resolved = await Promise.all(
       children.map(async (child) => {
         try {
-          const body = (await client
-            .repo(repository)
-            .manifests.get(child.digest)
-            .unwrap()) as unknown as Manifest;
+          const body = (await readManifest(client, repository, child.digest)).manifest as Manifest;
           return { child, size: transferSize(body), layers: (body.layers ?? []).length };
         } catch {
           return { child, size: undefined, layers: undefined };

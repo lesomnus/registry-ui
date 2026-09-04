@@ -10,7 +10,7 @@ import type { RegistryClient } from "./registry";
  * a list that looks complete and is not.
  */
 export async function listTags(client: RegistryClient, repository: string, pageSize = 1000, maxPages = 100): Promise<string[]> {
-  const collected: string[] = [];
+  const collected = new Set<string>();
   let last: string | undefined;
 
   for (let page = 0; page < maxPages; page++) {
@@ -20,15 +20,23 @@ export async function listTags(client: RegistryClient, repository: string, pageS
       break;
     }
 
-    collected.push(...tags);
+    const before = collected.size;
+    for (const tag of tags) {
+      collected.add(tag);
+    }
 
-    last = nextCursor(res.raw);
-    if (last === undefined) {
+    // A browser is often not allowed to read `Link`: CORS hides every response
+    // header but a short safelist unless the registry says otherwise, and most
+    // do not. The last name returned is what the spec says to send back, so it
+    // stands in -- and a page that adds nothing new ends the walk, since a
+    // registry whose cursor is not a name would otherwise be asked forever.
+    last = nextCursor(res.raw) ?? tags[tags.length - 1];
+    if (last === undefined || collected.size === before) {
       break;
     }
   }
 
-  return [...new Set(collected)];
+  return [...collected];
 }
 
 /** The `last` a `rel="next"` link asks to be given back. */

@@ -59,6 +59,12 @@ const passThrough = [
   "link",
   "www-authenticate",
   "oci-filters-applied",
+  // Whatever the registry says about holding on to this. Dropping them made
+  // every answer uncacheable, which is a decision this has no business making
+  // on the registry's behalf -- a manifest fetched by digest cannot go stale.
+  "cache-control",
+  "etag",
+  "last-modified",
 ];
 
 const staticFiles: Record<string, { path: string; type: string }> = {
@@ -132,7 +138,7 @@ async function forward(request: Request, raw: string): Promise<Response> {
   }
 
   const headers = new Headers();
-  for (const name of ["authorization", "accept", "range"]) {
+  for (const name of ["authorization", "accept", "range", "if-none-match", "if-modified-since"]) {
     const value = request.headers.get(name);
     if (value !== null) {
       headers.set(name, value);

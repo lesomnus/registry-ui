@@ -167,6 +167,26 @@ It answers preflights, and it lists what a page may read back in
 response whose `Docker-Content-Digest` and `Link` read as absent, and nothing
 errors: pages just stop paginating and digests come out as `-`.
 
+### What a browser is allowed to read
+
+CORS hides every response header except a short safelist unless the registry
+sends `Access-Control-Expose-Headers`, and most do not — zot sends
+`Docker-Content-Digest` and `Link` and exposes neither. In **direct** mode a
+page is therefore told less than the registry said. Two consequences, both
+handled rather than reported:
+
+- **The digest is computed**, not read. It is the SHA-256 of the manifest bytes
+  and the bytes are right here, so trusting a header was never necessary. When
+  the header *is* readable it is checked, and a registry naming a digest its own
+  bytes do not have is said out loud.
+- **Paging falls back to the last name returned** when `Link` cannot be read,
+  which is what the spec says to send back anyway. A page that adds nothing new
+  ends the walk, so a registry whose cursor is not a name stops rather than
+  looping.
+
+Through the forwarder both headers are readable — it exposes them — so this only
+bites in direct mode, and it does not bite.
+
 **direct** is on unless a deployment says otherwise: a page on a plain file
 server has no forwarder to reach, so talking to the registry from the browser is
 the only thing that can work there. It is also the better arrangement when it

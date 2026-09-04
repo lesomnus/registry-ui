@@ -32,14 +32,20 @@ export async function listRepositories(
       break;
     }
 
+    const before = collected.size;
     for (const repository of repositories) {
       collected.add(repository);
     }
 
     onPage?.([...collected]);
 
-    last = nextCursor(res.raw);
-    if (last === undefined) {
+    // A browser is often not allowed to read `Link`: CORS hides every response
+    // header but a short safelist unless the registry says otherwise, and most
+    // do not. The last name returned is what the spec says to send back, so it
+    // stands in -- and a page that adds nothing new ends the walk, since a
+    // registry whose cursor is not a name would otherwise be asked forever.
+    last = nextCursor(res.raw) ?? repositories[repositories.length - 1];
+    if (last === undefined || collected.size === before) {
       break;
     }
   }
