@@ -20,6 +20,10 @@
   --warn: #9a6700;
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 
+  --hover: #eef1f5;
+  --scroll-thumb: #c8cfd7;
+  --scroll-thumb-hover: #a4aeb9;
+
   --tok-key: #1a5fb4;
   --tok-string: #1a7f4b;
   --tok-number: #9a4b00;
@@ -40,6 +44,10 @@
     --ok: #4ec98a;
     --warn: #d9a441;
 
+    --hover: #1d242c;
+    --scroll-thumb: #39424d;
+    --scroll-thumb-hover: #55616f;
+
     --tok-key: #8ab4ff;
     --tok-string: #7fd6a4;
     --tok-number: #e0a26a;
@@ -49,6 +57,43 @@
 
 * {
   box-sizing: border-box;
+}
+
+/*
+ * Scrollbars, in both dialects.
+ *
+ * There are four of these on screen at once and the platform draws them at
+ * whatever width and contrast it likes, which on a four-pane layout is four
+ * heavy vertical rules between panes that already have borders. Firefox takes
+ * the two properties; everything else takes the pseudo-elements.
+ *
+ * The thumb is a padding-box background inside a transparent border, which is
+ * how you get an inset track without drawing one.
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 8px;
+  background-color: var(--scroll-thumb);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scroll-thumb-hover);
 }
 
 body {
@@ -392,8 +437,17 @@ input[type="search"]:focus {
   cursor: pointer;
 }
 
+/*
+ * This was `--bg-sunken`, which is *darker* than the pane in dark mode and a
+ * hair lighter in light mode -- a hover that was there and could not be seen,
+ * on the tag list most of all, where a row is a word and nothing else.
+ */
 .list button:hover {
-  background: var(--bg-sunken);
+  background: var(--hover);
+}
+
+.list button[aria-current="true"]:hover {
+  background: color-mix(in srgb, var(--accent-soft) 80%, var(--accent));
 }
 
 .list button[aria-current="true"] {
@@ -543,15 +597,57 @@ th.numeric {
   font-size: 13px;
 }
 
-/* One column, and the lists give up most of their height to the image. */
+/* The back buttons exist only where one pane is the whole screen. */
+.back {
+  display: none;
+}
+
+/*
+ * One pane at a time, and `data-level` says which.
+ *
+ * Stacking all of them was the old answer and it made a phone scroll past two
+ * lists to reach the thing it had just asked for. A level is the route rather
+ * than a mode: a repository with no reference *is* the tags, so picking one
+ * moves you and the back button is the same navigation as everything else here
+ * -- which is why the browser's own back button does the same thing.
+ */
 @media (max-width: 900px) {
   main {
-    grid-template-columns: 1fr;
-    overflow-y: auto;
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .list {
-    max-height: 260px;
+  main > .pane {
+    display: none;
+  }
+
+  main[data-level="repositories"] > .repositories,
+  main[data-level="tags"] > .tags,
+  main[data-level="image"] > .detail {
+    display: flex;
+  }
+
+  /* Clear of the registry in the corner, which is over this row. */
+  .pane-head {
+    padding-right: 150px;
+  }
+
+  .back {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    margin-right: 2px;
+    padding: 2px 8px 2px 4px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .back:hover {
+    background: var(--hover);
   }
 }
 

@@ -137,6 +137,13 @@ pane goes, and the section at the bottom of the image takes over — it is
 rendered either way, since the bytes are already in hand, and the stylesheet
 decides which one you see.
 
+**Below 900px there is one pane, and it is the whole screen.** Which one is not
+a mode — it is the address: a repository with nothing opened _is_ the tags, and
+a reference _is_ the image. So picking a repository moves you, the back button
+in the corner of each pane is ordinary navigation, and the browser's own back
+button does exactly the same thing. Stacking all four was the old answer, and it
+made a small screen scroll past two lists to reach what it had just asked for.
+
 The image pane names what it is showing on one line, with **copy** at the end of
 it for the whole pullable reference, registry and all. At the end rather than
 after the name: a reference is anything from eight characters to seventy, so a

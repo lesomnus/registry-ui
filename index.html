@@ -56,7 +56,7 @@
     <div id="scrim" hidden></div>
 
     <main>
-      <section class="pane">
+      <section class="pane repositories">
         <div class="pane-head">
           <h2>Repositories</h2>
           <span class="count" id="repository-count"></span>
@@ -67,8 +67,14 @@
         <div class="list" id="repository-list"><p class="empty">Not connected.</p></div>
       </section>
 
-      <section class="pane">
+      <section class="pane tags">
         <div class="pane-head">
+          <!--
+            Only on a narrow window, where one pane is the whole screen and the
+            panes beside it are the ones you came from. The stylesheet decides;
+            they are always here so that nothing has to be told about a resize.
+          -->
+          <button id="back-to-repositories" class="back" type="button">&#8249; Repositories</button>
           <h2>Tags</h2>
           <span class="count" id="tag-count"></span>
         </div>
@@ -76,7 +82,10 @@
       </section>
 
       <section class="pane detail">
-        <div class="pane-head"><h2>Image</h2></div>
+        <div class="pane-head">
+          <button id="back-to-tags" class="back" type="button">&#8249; Tags</button>
+          <h2>Image</h2>
+        </div>
         <div id="detail"><p class="empty">Pick a tag.</p></div>
       </section>
 

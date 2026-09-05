@@ -39,6 +39,9 @@ const el = {
   tagList: document.getElementById("tag-list") as HTMLElement,
   tagCount: document.getElementById("tag-count") as HTMLElement,
   detail: document.getElementById("detail") as HTMLElement,
+  main: document.querySelector("main") as HTMLElement,
+  backToRepositories: document.getElementById("back-to-repositories") as HTMLButtonElement,
+  backToTags: document.getElementById("back-to-tags") as HTMLButtonElement,
   manifest: document.getElementById("manifest") as HTMLElement,
   manifestType: document.getElementById("manifest-type") as HTMLElement,
 };
@@ -407,6 +410,19 @@ function renderTags(): void {
 const message = (error: unknown): string => String((error as Error).message ?? error);
 
 /**
+ * Which pane is the screen, when there is only room for one.
+ *
+ * Derived rather than held: a repository with no reference *is* the tags, so
+ * there is no mode to get out of step with where you are. Set on every route,
+ * ignored by the stylesheet above 900px, and the reason the back buttons are
+ * ordinary navigation -- the browser's own back button does the same thing.
+ */
+function setLevel(): void {
+  el.main.dataset["level"] =
+    state.repository === undefined ? "repositories" : state.reference === undefined ? "tags" : "image";
+}
+
+/**
  * Says something in the corner, or takes the corner back.
  *
  * There is nothing to report about a registry that answered: how many
@@ -661,6 +677,7 @@ async function applyRoute(): Promise<void> {
     el.detail.replaceChildren(element("p", "empty", "Pick a tag."));
 
     if (route.repository === undefined) {
+      setLevel();
       renderRepositories();
       el.tagList.replaceChildren(element("p", "empty", "Pick a repository."));
       el.tagCount.textContent = "";
@@ -668,6 +685,7 @@ async function applyRoute(): Promise<void> {
     }
 
     revealRepository(route.repository);
+    setLevel();
 
     await loadTags(route.repository, generation);
     if (generation !== state.generation) {
@@ -681,6 +699,7 @@ async function applyRoute(): Promise<void> {
 
   state.reference = route.reference;
   state.via = via;
+  setLevel();
   renderTags();
   await showDetail(generation);
 }
@@ -742,6 +761,7 @@ async function open(connection: Connection): Promise<boolean> {
   el.repositoryList.replaceChildren(element("p", "loading", "Loading..."));
   el.tagList.replaceChildren(element("p", "empty", "Pick a repository."));
   el.detail.replaceChildren(element("p", "empty", "Pick a tag."));
+  setLevel();
 
   // A different registry, so nothing read from the last one still applies: the
   // key holds the domain, but a stale entry is dead weight either way.
@@ -909,6 +929,9 @@ el.domain.addEventListener("mousedown", (event) => {
     showConnection(!connectionIsOpen());
   }
 });
+
+el.backToRepositories.addEventListener("click", () => go({}));
+el.backToTags.addEventListener("click", () => go({ repository: state.repository }));
 
 el.scrim.addEventListener("mousedown", closeConnection);
 document.addEventListener("keydown", (event) => {
