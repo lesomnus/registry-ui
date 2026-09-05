@@ -6,49 +6,53 @@
     <title>Registry UI</title>
   </head>
   <body>
-    <header>
+    <!--
+      The registry lives in the corner, over the page rather than above it.
+      A row of its own was a row spent on a domain and a number the repository
+      pane already shows.
+
+      Nothing here is in the document flow, so `main` gets the whole window. The
+      form grows downward when it opens and the domain does not move: it is the
+      first thing in the form, the form's padding is the same in both states,
+      and the input's border is transparent when shut rather than absent. Its
+      width comes from `size` rather than from the form, so the box it sits in
+      is the same whether the card behind it is there or not.
+    -->
+    <div id="corner">
       <div id="brand" hidden><img id="logo" alt="" hidden /><span id="title"></span></div>
 
-      <!--
-        The domain is the only part of this that is ever on screen, and it does
-        not move when the rest appears: the form is absolutely positioned in a
-        slot of the closed size, its padding is the same in both states, and the
-        input's border is transparent rather than absent. So "open" adds a
-        background and some siblings and shifts nothing.
-      -->
-      <div id="connection-slot">
-        <form id="connection">
+      <form id="connection">
+        <input
+          id="domain"
+          type="text"
+          size="24"
+          placeholder="registry.example"
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="Registry"
+        />
+        <div id="connection-more">
+          <input id="username" type="text" placeholder="username" autocomplete="username" />
+          <input id="password" type="password" placeholder="password or token" autocomplete="current-password" />
           <input
-            id="domain"
+            id="forwarder"
             type="text"
-            placeholder="registry.example, or localhost:5000"
+            placeholder="forwarder URL (only if not direct)"
             autocomplete="off"
             spellcheck="false"
-            aria-label="Registry"
           />
-          <div id="connection-more">
-            <input id="username" type="text" placeholder="username" autocomplete="username" />
-            <input id="password" type="password" placeholder="password or token" autocomplete="current-password" />
-            <input
-              id="forwarder"
-              type="text"
-              placeholder="forwarder URL (only if not direct)"
-              autocomplete="off"
-              spellcheck="false"
-            />
-            <div class="connection-row">
-              <label class="direct" id="insecure-label"><input id="insecure" type="checkbox" /> http</label>
-              <label class="direct" id="direct-label"><input id="direct" type="checkbox" /> direct</label>
-              <span class="spacer"></span>
-              <button id="reset" class="toggle" type="button" title="Forget what this browser remembers">reset</button>
-              <button id="open" type="submit">Open</button>
-            </div>
+          <div class="connection-row">
+            <label class="direct" id="insecure-label"><input id="insecure" type="checkbox" /> http</label>
+            <label class="direct" id="direct-label"><input id="direct" type="checkbox" /> direct</label>
+            <span class="spacer"></span>
+            <button id="reset" class="toggle" type="button" title="Forget what this browser remembers">reset</button>
+            <button id="open" type="submit">Open</button>
           </div>
-        </form>
-      </div>
+        </div>
+      </form>
 
-      <p id="status" class="status">Enter a registry.</p>
-    </header>
+      <p id="status" class="status" hidden></p>
+    </div>
     <div id="scrim" hidden></div>
 
     <main>

@@ -102,18 +102,26 @@ to believe it.
 
 ## The registry, and the room it takes up
 
-There is one row at the top: a logo if the deployment has one, the registry, and
-what it last said. The registry is the connection form — it does not sit beside
-it. Clicking it opens the rest downward over the page, and **the domain does not
-move by a pixel** when it does: the form is out of flow in a slot of the closed
-size, its padding is the same in both states, and the input's border is
-transparent when shut rather than absent. Opening adds paint and siblings and
-shifts nothing.
+There is no header. The registry sits in the top-right corner, over the page
+rather than above it, and the layout gets the whole window — a row of its own
+was a row spent on a domain and a repository count the pane below already shows.
+
+The registry **is** the connection form. Clicking it opens the rest downward,
+and **the domain does not move by a pixel** when it does: it is the first thing
+in the form, the form's padding is the same in both states, the input's border
+is transparent when shut rather than absent, and its width comes from `size`
+rather than from the card — so the card appearing behind it changes nothing
+about where it is. Opening adds paint and siblings and shifts nothing, by
+construction rather than by two numbers agreeing.
 
 It cannot be dismissed before there is a connection, which is also how the first
 visit states itself — no registry means the form is the page, with no separate
 flag saying so. A registry that answers as something other than a registry
 leaves it open too, on the field you are about to correct.
+
+The corner speaks only when there is something to say. "221 repositories" is
+written on the pane that lists them; a failure, and the reason a registry would
+not list, get the corner.
 
 The two lists are a fixed width and the image pane takes the rest. They were
 fractions, which on a wide screen spent half the window on two columns of short
@@ -426,6 +434,14 @@ you are reading — new names arrive below, which is where they belong.
 It is not infinite scroll: the pages are fetched as fast as the registry answers
 rather than when you reach the bottom. The scrollbar is honest about what has
 arrived, and grows.
+
+**The counts beside each list are counted here, not reported.** Neither
+`_catalog` nor `tags/list` has a total in it — the distribution spec has no such
+field and no endpoint that answers the question — so the number is however many
+names the walk has collected. Tags are counted after the last page, so that one
+is final when it appears. Repositories are drawn as the pages arrive, so that
+one climbs. Either way it is what the registry was willing to list, which
+`_catalog` is explicitly allowed to make less than what exists.
 
 The lists then only build the rows you can see. A registry with fifty thousand
 tags would otherwise be fifty thousand elements to lay out and keep, paid again

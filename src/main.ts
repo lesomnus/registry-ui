@@ -263,6 +263,7 @@ function fillForm(config: PageConfig): void {
   const fixed = config.locked === true;
 
   el.domain.value = (fixed ? config.domain : (saved.domain ?? config.domain)) ?? "";
+  sizeDomain();
   el.username.value = saved.username ?? "";
   el.forwarder.value = (fixed ? config.forwarder : (saved.forwarder ?? config.forwarder)) ?? "";
 
@@ -404,6 +405,20 @@ function renderTags(): void {
 }
 
 const message = (error: unknown): string => String((error as Error).message ?? error);
+
+/**
+ * Says something in the corner, or takes the corner back.
+ *
+ * There is nothing to report about a registry that answered: how many
+ * repositories it has is written on the pane that lists them, and saying it
+ * again up here is what made a whole row not worth its height. So success is
+ * silence, and the corner is for the things that need somewhere to be said.
+ */
+function setStatus(text: string | undefined, kind: "info" | "warn" | "error" = "info"): void {
+  el.status.hidden = text === undefined;
+  el.status.textContent = text ?? "";
+  el.status.className = kind === "info" ? "status" : `status ${kind}`;
+}
 
 /**
  * Redraws the repository list with `name` selected, and puts it where it can be
@@ -640,8 +655,7 @@ async function reconnect(connection: Connection, route: Route): Promise<void> {
 
 /** Connects. Answers whether the registry is one, which is all a caller needs. */
 async function open(connection: Connection): Promise<boolean> {
-  el.status.textContent = `Connecting to ${connection.domain}...`;
-  el.status.className = "status";
+  setStatus(`Connecting to ${connection.domain}...`);
   state.repositories = [];
   state.repository = undefined;
   state.tags = [];
@@ -672,8 +686,7 @@ async function open(connection: Connection): Promise<boolean> {
     // connection form may be dismissed: a form shut onto a page with nothing
     // behind it is a dead end.
     state.client = undefined;
-    el.status.textContent = `${connection.domain} did not answer as a registry: ${message(error)}`;
-    el.status.className = "status error";
+    setStatus(`${connection.domain} did not answer as a registry: ${message(error)}`, "error");
     el.repositoryList.replaceChildren();
     return false;
   }
@@ -683,7 +696,7 @@ async function open(connection: Connection): Promise<boolean> {
   // Listed in the background rather than waited for. A link straight to an
   // image should open the image; the catalog of a large registry takes seconds
   // and fills the pane it belongs to while that happens.
-  void list(client, connection);
+  void list(client);
   return true;
 }
 
@@ -694,7 +707,7 @@ async function open(connection: Connection): Promise<boolean> {
  * finishes: every write to the page is behind the same check that the client it
  * was started for is still the one in use.
  */
-async function list(client: RegistryClient, connection: Connection): Promise<void> {
+async function list(client: RegistryClient): Promise<void> {
   try {
     // Drawn as the pages arrive. The scroll position is held across each
     // redraw, so a list growing underneath somebody does not move what they are
@@ -706,7 +719,6 @@ async function list(client: RegistryClient, connection: Connection): Promise<voi
 
       const held = listAnchor(el.repositoryList);
       state.repositories = [...repositories].sort();
-      el.status.textContent = `${connection.domain} — ${state.repositories.length} repositories`;
       renderRepositories();
       if (held !== undefined) {
         scrollListTo(el.repositoryList, held);
@@ -717,7 +729,7 @@ async function list(client: RegistryClient, connection: Connection): Promise<voi
       return;
     }
 
-    el.status.textContent = `${connection.domain} — ${state.repositories.length} repositories`;
+    setStatus(undefined);
     renderRepositories();
   } catch (error) {
     if (state.client !== client) {
@@ -726,8 +738,7 @@ async function list(client: RegistryClient, connection: Connection): Promise<voi
 
     // A registry that will not list is still one whose images can be opened,
     // if you know their names -- so this is a note rather than a failure.
-    el.status.textContent = `${connection.domain} — no repository list: ${message(error)}`;
-    el.status.className = "status warn";
+    setStatus(`no repository list: ${message(error)}`, "warn");
     el.repositoryList.replaceChildren(element("p", "empty", "This registry does not list its repositories."));
   }
 }
@@ -799,6 +810,18 @@ function onFilterInput(): void {
   }, 250);
 }
 
+/**
+ * The field is as wide as what is in it.
+ *
+ * Which is what keeps the domain still when the form opens: everything below it
+ * is the width of the card, and this one is the width of the registry's name,
+ * so the card appearing behind it changes nothing about where it is.
+ */
+function sizeDomain(): void {
+  el.domain.size = Math.min(40, Math.max(12, el.domain.value.length + 1));
+}
+
+el.domain.addEventListener("input", sizeDomain);
 el.domain.addEventListener("focus", () => showConnection(true));
 el.domain.addEventListener("mousedown", (event) => {
   // A read-only registry is a label. Clicking it opens the form for the parts
