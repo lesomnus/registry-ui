@@ -1,6 +1,7 @@
 import type { RegistryClient } from "../registry";
 import { sbom, vnd } from "@lesomnus/oci-client/media-types";
 import { base64ToBytes, readFulcioIdentity } from "../certificate";
+import { cache } from "../manifest";
 import { sigstoreBundle } from "../media-types";
 import { definitions, element, externalLink, formatSize, shortDigest, table } from "./dom";
 
@@ -78,10 +79,17 @@ export const artifactRenderers: Record<string, Renderer> = {
   [vnd.cncf.notary.signature]: renderNotation,
 };
 
-/** A blob, which unlike a manifest is left unread by the client for us to parse. */
+/**
+ * A blob, which unlike a manifest is left unread by the client for us to parse.
+ *
+ * Always by digest, so always cacheable: a signature bundle opened twice is
+ * fetched once.
+ */
 async function readBlob(client: RegistryClient, repository: string, digest: string): Promise<unknown> {
-  const res = await client.repo(repository).blobs.get(digest).unwrap();
-  return await res.raw.json();
+  return await cache.get(`${client.domain}/${repository}/blobs@${digest}`, async () => {
+    const res = await client.repo(repository).blobs.get(digest).unwrap();
+    return await res.raw.json();
+  });
 }
 
 type SigstoreBundle = {

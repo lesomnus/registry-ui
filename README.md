@@ -167,6 +167,24 @@ It answers preflights, and it lists what a page may read back in
 response whose `Docker-Content-Digest` and `Link` read as absent, and nothing
 errors: pages just stop paginating and digests come out as `-`.
 
+### What is asked for twice, and what is not
+
+Anything fetched **by digest** is remembered for the session: a manifest or a
+blob at a digest is the bytes that digest names, so there is no version of it to
+be stale against. Anything fetched by **tag** is not, because a tag is a name
+somebody can move — and neither are the listings.
+
+It asks once rather than merely remembering once. The entry is claimed before
+the fetch, so the children of an index, which are fetched together and can be
+the same digest twice over, share one request instead of racing to miss.
+
+Redrawing the same image index costs 10 requests cold and 6 warm — what remains
+is the tag and the referrer listings, which are the parts that can change.
+
+In memory, and only for the session. These are kilobytes each, and localStorage
+is a synchronous few megabytes shared with everything else on the origin, which
+is a poor place for a cache a reload rebuilds in a second.
+
 ### What a browser is allowed to read
 
 CORS hides every response header except a short safelist unless the registry

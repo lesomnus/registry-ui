@@ -1,6 +1,7 @@
 import "./style.css";
 import { listRepositories } from "./catalog";
 import { loadConfig, type PageConfig } from "./config";
+import { cache } from "./manifest";
 import { listAnchor, renderList, scrollListTo } from "./render/list";
 import { ancestorsOf, buildTree, flattenTree } from "./render/tree";
 import { listTags } from "./tags";
@@ -302,6 +303,10 @@ async function open(connection: Connection): Promise<void> {
   el.repositoryList.replaceChildren(element("p", "loading", "Loading..."));
   el.tagList.replaceChildren(element("p", "empty", "Pick a repository."));
   el.detail.replaceChildren(element("p", "empty", "Pick a tag."));
+
+  // A different registry, so nothing read from the last one still applies: the
+  // key holds the domain, but a stale entry is dead weight either way.
+  cache.clear();
 
   const [domain, init] = connectionOf(connection);
   const client = connect(connection);

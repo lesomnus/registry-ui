@@ -1,3 +1,4 @@
+import { DigestCache, isDigest } from "./cache";
 import type { RegistryClient } from "./registry";
 
 /**
@@ -28,7 +29,31 @@ export type ReadManifest = {
   mismatch?: string;
 };
 
+/**
+ * What has already been read, by digest.
+ *
+ * Cleared when the connection changes: the same digest at a different registry
+ * is the same bytes, but the same *repository* name at a different registry is
+ * not, and the key is built from both.
+ */
+export const cache = new DigestCache();
+
 export async function readManifest(
+  client: RegistryClient,
+  repository: string,
+  reference: string,
+): Promise<ReadManifest> {
+  // A tag is a name somebody can move; a digest is the bytes it names.
+  if (isDigest(reference)) {
+    return await cache.get(`${client.domain}/${repository}@${reference}`, () =>
+      fetchManifest(client, repository, reference),
+    );
+  }
+
+  return await fetchManifest(client, repository, reference);
+}
+
+async function fetchManifest(
   client: RegistryClient,
   repository: string,
   reference: string,
