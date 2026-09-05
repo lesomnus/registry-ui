@@ -31,12 +31,22 @@ FROM joseluisq/static-web-server:2.44.0-alpine
 COPY --from=build --chown=1000:1000 /src/dist /public
 COPY --chown=1000:1000 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# `page-fallback` is what makes a reload of any path land on the app rather than
-# on a 404. There are no routes yet, and there is no reason to notice the day
-# there are.
+# No fallback page, on purpose, and it is worth saying why: SWS has one
+# (`--page-fallback`, `SERVER_FALLBACK_PAGE`) and turning it on breaks this
+# build rather than helping it.
+#
+# The app is built with a relative asset base so one image serves from any mount
+# point. At `/some/route`, `./assets/app.js` resolves to `/some/route/assets/...`
+# -- which the fallback answers with index.html and a 200. A module script
+# arriving as text/html does not run, and `config.json` arriving as text/html
+# takes this deployment's own settings with it. Every one of those is a 200, so
+# nothing says a word.
+#
+# Nothing needs it: the app's routes live in the fragment, which never reaches a
+# server. See src/route.ts. A path that is not here is a 404, which is what it
+# is.
 ENV SERVER_ROOT=/public \
     SERVER_PORT=8080 \
-    SERVER_PAGE_FALLBACK=/public/index.html \
     SERVER_COMPRESSION=true \
     SERVER_HEALTH=true
 EXPOSE 8080

@@ -77,10 +77,28 @@ rather than `latest`. A deployment that [fixed its registry](#a-ui-for-one-regis
 ignores the domain in a link — the lock is presentation rather than enforcement,
 but an address that walked around it would be presentation of nothing.
 
-It is a fragment rather than a path because this is built to be served by
-anything that serves files. A path route needs the server to answer every path
-with `index.html`; a fragment never reaches the server, so the same build works
-on GitHub Pages, under any base path, out of a bucket.
+It is a fragment rather than a path, and not because a fallback is hard to
+arrange — static-web-server has one flag for it, and GitHub Pages has the
+`404.html` trick. It is because **this build does not know where it is mounted.**
+Assets are referenced relatively so that one image serves from the root of a
+bucket, from `/registry-ui/` on Pages, or from wherever somebody puts it. Under
+a path route that is fatal, and quietly:
+
+```
+GET /cr.example/app/kamiadm            200  text/html   the app
+GET /cr.example/app/assets/app.js      200  text/html   ← the fallback again
+GET /cr.example/app/config.json        200  text/html   ← and again
+```
+
+The browser resolves `./assets/app.js` against the route it is on, the fallback
+answers it with the page, a module script arriving as `text/html` does not run,
+and `config.json` arriving as `text/html` takes the deployment's own settings
+with it. Every one of them is a 200.
+
+Making that work means telling the app its own prefix — an absolute `base` at
+build time, which is an image per mount point, or a `<base href>` written at
+startup, which Pages has no startup to write. A fragment never reaches a server
+and costs neither.
 
 ## Containers
 
