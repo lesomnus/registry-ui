@@ -60,7 +60,10 @@ export function rawPane(text: string, mediaType: string | undefined, note?: stri
   const body = pretty(text, mediaType);
   const { nodes, language, tooLarge } = highlight(body, mediaType);
 
-  const notes = [note, tooLarge ? `Too large to highlight, so this is ${language ?? "plain"} without colour.` : undefined]
+  const notes = [
+    note,
+    tooLarge ? `Too large to highlight, so this is ${language ?? "plain"} without colour.` : undefined,
+  ]
     .filter((line): line is string => line !== undefined)
     .join(" ");
   if (notes !== "") {
@@ -79,7 +82,8 @@ async function save(
   layer: Layer,
   button: HTMLButtonElement,
 ): Promise<void> {
-  const was = button.textContent;
+  // The label is the size, so it is restored rather than remembered: whatever
+  // this says while it is working, it goes back to saying how big the layer is.
   button.disabled = true;
   button.textContent = "saving...";
 
@@ -102,7 +106,7 @@ async function save(
     // has followed it cancels the download it was for.
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
 
-    button.textContent = was;
+    button.textContent = formatSize(layer.size);
   } catch (error) {
     // The forwarder refuses a body over its limit, and a registry can refuse
     // for its own reasons. Either way the button is where the person is
@@ -110,6 +114,7 @@ async function save(
     button.textContent = "failed";
     button.title = message(error);
     console.warn("blob download failed", error);
+    setTimeout(() => (button.textContent = formatSize(layer.size)), 4000);
   } finally {
     button.disabled = false;
   }
@@ -125,8 +130,10 @@ async function save(
  * - **view**, for a media type that is text. The name is the handle, the way a
  *   platform and an artifact type are elsewhere. JSON is indented on the way
  *   out; anything else is shown as it arrived.
- * - **save**, for all of them, named by the `org.opencontainers.image.title`
- *   annotation when the pusher left one.
+ * - **save**, on the size. What a layer costs to download is what its size
+ *   says, so that is the thing to hang the download on rather than a word in a
+ *   column of its own -- and the file is named by the
+ *   `org.opencontainers.image.title` annotation when the pusher left one.
  *
  * Nothing is fetched until something is clicked: a manifest names its layers
  * and their sizes, so the table is drawn from the manifest alone.
@@ -161,7 +168,7 @@ export function layersSection(client: RegistryClient, repository: string, layers
       first = { text: name, node: label };
     }
 
-    const download = element("button", "linklike", "save");
+    const download = element("button", "linklike", formatSize(layer.size));
     download.title = `Download ${name}`;
     download.addEventListener("click", () => void save(client, repository, layer, download));
 
@@ -169,16 +176,12 @@ export function layersSection(client: RegistryClient, repository: string, layers
       first,
       { text: layer.mediaType ?? "-" },
       { text: shortDigest(layer.digest) },
-      { text: formatSize(layer.size), numeric: true },
-      { text: "", node: download },
+      { text: formatSize(layer.size), node: download, numeric: true },
     ];
   });
 
   fragment.append(
-    table(
-      [{ text: "Layer" }, { text: "Media type" }, { text: "Digest" }, { text: "Size", numeric: true }, { text: "" }],
-      rows,
-    ),
+    table([{ text: "Layer" }, { text: "Media type" }, { text: "Digest" }, { text: "Size", numeric: true }], rows),
     detail,
   );
 

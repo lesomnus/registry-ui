@@ -245,7 +245,7 @@ body {
  */
 main {
   display: grid;
-  grid-template-columns: 300px 200px minmax(420px, 560px) minmax(0, 1fr);
+  grid-template-columns: 300px 200px minmax(600px, 700px) minmax(0, 1fr);
   gap: 1px;
   flex: 1;
   min-height: 0;
@@ -256,7 +256,7 @@ main {
  * Not enough room for four, so the manifest goes back to the bottom of the
  * image and the image takes what is left.
  */
-@media (max-width: 1240px) {
+@media (max-width: 1439px) {
   main {
     grid-template-columns: 300px 200px minmax(0, 1fr);
   }
@@ -267,7 +267,7 @@ main {
 }
 
 /* The pane is the manifest, so the copy at the bottom of the image is not. */
-@media (min-width: 1241px) {
+@media (min-width: 1440px) {
   .manifest-inline {
     display: none;
   }
@@ -449,6 +449,30 @@ input[type="search"]:focus {
 
 .trail-ref {
   min-width: 0;
+}
+
+/*
+ * Pinned to the end of the line rather than trailing the name.
+ *
+ * The reference in front of it is anything from eight characters to seventy,
+ * so a button that follows it is a button in a different place on every image.
+ * The pane is a fixed width; this is at the end of it.
+ */
+.copy {
+  flex: none;
+  margin-left: auto;
+  padding: 1px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font: 11px var(--mono);
+  cursor: pointer;
+}
+
+.copy:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 dl {

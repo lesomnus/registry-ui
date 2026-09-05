@@ -66,13 +66,15 @@ structured suffix is for and why the suffix is what gets read.
 pusher says when it is not saying, and guessing turns a 60 MB binary into 60 MB
 of replacement characters.
 
-Every layer can be **saved**, named by `org.opencontainers.image.title` when the
-pusher left one — which `oras push` does, so an artifact comes down as the file
-it went up as:
+Every layer can be **saved, by clicking its size** — what a download costs is
+what the size says, so that is the thing to hang it on rather than a word in a
+column of its own. The file is named by `org.opencontainers.image.title` when
+the pusher left one, which `oras push` does, so an artifact comes down as the
+file it went up as:
 
 ```
 Layer      Media type                  Digest        Size
-kamiadm    application/octet-stream    f3bc32e5f821  60 MiB   save
+kamiadm    application/octet-stream    f3bc32e5f821  60 MiB   ← click it
 ```
 
 Nothing is fetched until something is clicked; a manifest already names its
@@ -134,6 +136,14 @@ beside it rather than under it. Below 1240px there is not room for four, the
 pane goes, and the section at the bottom of the image takes over — it is
 rendered either way, since the bytes are already in hand, and the stylesheet
 decides which one you see.
+
+The image pane names what it is showing on one line, with **copy** at the end of
+it for the whole pullable reference, registry and all. At the end rather than
+after the name: a reference is anything from eight characters to seventy, so a
+button that follows it is a button somewhere different on every image. A digest
+is shortened there, because it is written out in full in the Digest field two
+lines below and saying all seventy-one characters twice wrapped the line to
+repeat what was already on screen.
 
 ## The address is a reference
 

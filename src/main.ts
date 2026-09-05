@@ -9,7 +9,7 @@ import { listTags } from "./tags";
 import { connect, connectionOf, type Connection, type RegistryClient } from "./registry";
 import { Search, type RepoSummary } from "./search";
 import { rawPane } from "./render/blob";
-import { element } from "./render/dom";
+import { element, shortDigest } from "./render/dom";
 import { renderImage } from "./render/image";
 import { formatRoute, parseRoute, type Route } from "./route";
 
@@ -465,8 +465,70 @@ function trail(repository: string, reference: string): Node {
     line.append(back, element("span", "trail-sep", "\u203a"));
   }
 
-  line.append(element("span", "trail-ref", `${isDigest(reference) ? "@" : ":"}${reference}`));
+  // A digest is said short here. It is written out in full two lines below, in
+  // the Digest field, and saying all seventy-one characters twice pushed the
+  // line onto three rows to repeat what was already there.
+  const digest = isDigest(reference);
+  const ref = element("span", "trail-ref", digest ? `@${shortDigest(reference)}\u2026` : `:${reference}`);
+  if (digest) {
+    ref.title = reference;
+  }
+
+  line.append(ref, copyButton(fullReference(repository, reference)));
   return line;
+}
+
+/** What `docker pull` would take: the registry, the repository, the reference. */
+function fullReference(repository: string, reference: string): string {
+  const name = state.domain === undefined ? repository : `${state.domain}/${repository}`;
+  return `${name}${isDigest(reference) ? "@" : ":"}${reference}`;
+}
+
+/**
+ * Copies `text`, and says whether it managed to.
+ *
+ * `navigator.clipboard` exists only in a secure context, and this page is meant
+ * to be servable over plain http to an internal host -- the same reason the
+ * digest is computed only where it can be. So there is the old way underneath,
+ * and if neither works the button says so rather than looking like it worked.
+ */
+function copyButton(text: string): HTMLElement {
+  const button = element("button", "copy", "copy");
+  button.title = text;
+  button.setAttribute("aria-label", `Copy ${text}`);
+
+  button.addEventListener("click", () => {
+    void copy(text).then((ok) => {
+      button.textContent = ok ? "copied" : "failed";
+      setTimeout(() => (button.textContent = "copy"), 1200);
+    });
+  });
+
+  return button;
+}
+
+async function copy(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Not a secure context, or permission refused.
+  }
+
+  try {
+    const area = element("textarea");
+    area.value = text;
+    area.setAttribute("aria-hidden", "true");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.append(area);
+    area.select();
+    const ok = document.execCommand("copy");
+    area.remove();
+    return ok;
+  } catch {
+    return false;
+  }
 }
 
 async function loadTags(repository: string, generation: number): Promise<void> {
