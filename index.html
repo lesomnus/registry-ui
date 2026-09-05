@@ -63,7 +63,13 @@
           <!-- Label and pressed state are set from the state it toggles. -->
           <button id="view-toggle" class="toggle" type="button" title="Group by prefix, or list every name"></button>
         </div>
-        <input id="repository-filter" type="search" placeholder="Filter repositories" autocomplete="off" />
+        <input
+          id="repository-filter"
+          type="search"
+          placeholder="Filter repositories, or /regex/"
+          autocomplete="off"
+          spellcheck="false"
+        />
         <div class="list" id="repository-list"><p class="empty">Not connected.</p></div>
       </section>
 
@@ -78,6 +84,13 @@
           <h2>Tags</h2>
           <span class="count" id="tag-count"></span>
         </div>
+        <input
+          id="tag-filter"
+          type="search"
+          placeholder="Filter tags, or /regex/"
+          autocomplete="off"
+          spellcheck="false"
+        />
         <div class="list" id="tag-list"><p class="empty">Pick a repository.</p></div>
       </section>
 

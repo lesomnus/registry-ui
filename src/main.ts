@@ -11,6 +11,7 @@ import { Search, type RepoSummary } from "./search";
 import { rawPane } from "./render/blob";
 import { element, shortDigest } from "./render/dom";
 import { renderImage } from "./render/image";
+import { filterNames, fuzzyRanges, parseQuery, rangesOf, type Mode, type Ranges } from "./match";
 import { pager, type Pager } from "./pager";
 import { formatRoute, parseRoute, type Route } from "./route";
 
@@ -36,6 +37,7 @@ const el = {
   repositoryList: document.getElementById("repository-list") as HTMLElement,
   repositoryCount: document.getElementById("repository-count") as HTMLElement,
   filter: document.getElementById("repository-filter") as HTMLInputElement,
+  tagFilter: document.getElementById("tag-filter") as HTMLInputElement,
   view: document.getElementById("view-toggle") as HTMLButtonElement,
   tagList: document.getElementById("tag-list") as HTMLElement,
   tagCount: document.getElementById("tag-count") as HTMLElement,
@@ -96,33 +98,55 @@ const state: {
 };
 
 /**
- * Where every occurrence of `needle` is in `haystack`, case-insensitively.
+ * What a filter box currently selects, and how each name matched.
  *
- * Every occurrence rather than the first, because a name is a path and the
- * thing typed is often in more than one of its segments.
+ * The same for both lists, because it is the same question. See match.ts for
+ * what the three modes are and how the syntax picks one.
  */
-function matchesIn(haystack: string, needle: string): [number, number][] {
-  if (needle === "") {
-    return [];
+type Filtered = {
+  /** The names to show, in the order to show them. */
+  names: string[];
+  /** Where the query matched, for any string -- a name or a tree label. */
+  ranges: (text: string) => Ranges;
+  /** Absent when nothing was typed. */
+  mode?: Mode;
+  /** A pattern that would not compile, said in the words the engine used. */
+  error?: string;
+};
+
+const nothing = (): Ranges => [];
+
+function applyFilter(names: string[], raw: string): Filtered {
+  const query = parseQuery(raw);
+  if (query === undefined) {
+    return { names, ranges: nothing };
   }
 
-  const ranges: [number, number][] = [];
-  const lower = haystack.toLowerCase();
-  const target = needle.toLowerCase();
-  let at = lower.indexOf(target);
-  while (at >= 0) {
-    ranges.push([at, at + target.length]);
-    at = lower.indexOf(target, at + target.length);
+  if (query.mode === "regex" && "error" in query) {
+    return { names: [], ranges: nothing, mode: "regex", error: query.error };
   }
 
-  return ranges;
+  const { mode, matches } = filterNames(names, query);
+  const found = new Map(matches.map((match) => [match.name, match.ranges]));
+
+  return {
+    names: matches.map((match) => match.name),
+    // A tree row's label is a run of path segments rather than a whole name, so
+    // its highlight has to be found in the label itself rather than looked up.
+    ranges: (text) =>
+      found.get(text) ??
+      (mode === "fuzzy" && query.mode === "text"
+        ? (fuzzyRanges(text, query.text)?.ranges ?? [])
+        : (rangesOf(text, query) ?? [])),
+    mode,
+  };
 }
 
-/**
- * Ranges of a tree row's label, whose label is a run of path segments rather
- * than the whole name -- so the offsets have to be found in the label itself.
- */
-const labelMatches = (label: string, filter: string): [number, number][] => matchesIn(label, filter);
+/** `9/221`, with what is still arriving and how it was matched. */
+function countText(shown: number, total: number, more: boolean, mode: Mode | undefined): string {
+  const of = shown === total ? `${shown}` : `${shown}/${total}`;
+  return `${of}${more ? "+" : ""}${mode === undefined || mode === "text" ? "" : ` ${mode}`}`;
+}
 
 /** What the last connection was, so a reload does not mean typing it again. */
 const remembered = "registry-ui.connection";
@@ -288,8 +312,7 @@ function fillForm(config: PageConfig): void {
 
 function renderRepositories(): void {
   const filter = el.filter.value.trim();
-  const lower = filter.toLowerCase();
-  const local = filter ? state.repositories.filter((name) => name.toLowerCase().includes(lower)) : state.repositories;
+  const found = applyFilter(state.repositories, filter);
 
   // What the registry found and this browser does not have. Appended rather
   // than merged in order: the local matches are already on screen, and an
@@ -298,19 +321,20 @@ function renderRepositories(): void {
   const remoteOnly =
     filter && state.foundFor === filter ? [...state.found.keys()].filter((name) => !known.has(name)).sort() : [];
 
-  const shown = [...local, ...remoteOnly];
+  const shown = [...found.names, ...remoteOnly];
 
   // A trailing `+` for a list that is not all here yet: the number is what has
   // arrived, and saying it flat would be claiming the registry has that many.
-  const more = state.catalog?.done === false ? "+" : "";
-  el.repositoryCount.textContent =
-    shown.length === state.repositories.length
-      ? `${shown.length}${more}`
-      : `${shown.length}/${state.repositories.length}${more}`;
+  el.repositoryCount.textContent = countText(
+    shown.length,
+    state.repositories.length,
+    state.catalog?.done === false,
+    found.mode,
+  );
 
   const wantMore = () => void state.catalog?.more();
 
-  const empty = filter ? "Nothing matches." : "No repositories.";
+  const empty = found.error ?? (filter ? "Nothing matches." : "No repositories.");
   if (!state.tree) {
     renderList(
       el.repositoryList,
@@ -318,7 +342,7 @@ function renderRepositories(): void {
         key: name,
         label: name,
         kind: "repository" as const,
-        matches: matchesIn(name, filter),
+        matches: found.ranges(name),
         note: known.has(name) ? undefined : "found",
         current: name === state.repository,
         onSelect: () => go({ repository: name }),
@@ -334,7 +358,7 @@ function renderRepositories(): void {
     flattenTree(
       buildTree(shown),
       state.expanded,
-      (label) => labelMatches(label, filter),
+      (label) => found.ranges(label),
       (repository) => repository === state.repository,
       (repository) => go({ repository }),
       (path) => {
@@ -407,17 +431,21 @@ function selectedTag(): string | undefined {
 
 function renderTags(): void {
   const page = state.tagsOf;
-  el.tagCount.textContent = `${state.tags.length}${page?.done === false ? "+" : ""}`;
+  const filter = el.tagFilter.value.trim();
+  const found = applyFilter(state.tags, filter);
   const current = selectedTag();
+
+  el.tagCount.textContent = countText(found.names.length, state.tags.length, page?.done === false, found.mode);
   renderList(
     el.tagList,
-    state.tags.map((tag) => ({
+    found.names.map((tag) => ({
       key: tag,
       label: tag,
+      matches: found.ranges(tag),
       current: tag === current,
       onSelect: () => go({ repository: state.repository, reference: tag }),
     })),
-    "No tags.",
+    found.error ?? (filter ? "Nothing matches." : "No tags."),
     () => void page?.more(),
   );
 }
@@ -706,6 +734,7 @@ async function applyRoute(): Promise<void> {
     state.repository = route.repository;
     state.tags = [];
     state.tagsOf = undefined;
+    el.tagFilter.value = "";
     state.reference = undefined;
     state.via = undefined;
     el.detail.replaceChildren(element("p", "empty", "Pick a tag."));
@@ -933,6 +962,13 @@ function drain(page: Pager<string> | undefined, redraw: () => void): void {
   });
 }
 
+function onTagFilterInput(): void {
+  renderTags();
+  if (el.tagFilter.value.trim() !== "") {
+    drain(state.tagsOf, renderTags);
+  }
+}
+
 function onFilterInput(): void {
   renderRepositories();
   if (el.filter.value.trim() !== "") {
@@ -944,7 +980,10 @@ function onFilterInput(): void {
     clearTimeout(searchTimer);
   }
 
-  if (query === "" || state.search === undefined) {
+  // A registry's search endpoint takes a word, not a pattern: handing it
+  // `/^(kam|bos)/` asks it about a repository nobody has. The local filter
+  // still runs, over everything, because typing pulled the whole list down.
+  if (query === "" || query.startsWith("/") || state.search === undefined) {
     state.found = new Map();
     state.foundFor = "";
     return;
@@ -1007,6 +1046,7 @@ document.addEventListener("keydown", (event) => {
 });
 
 el.filter.addEventListener("input", onFilterInput);
+el.tagFilter.addEventListener("input", onTagFilterInput);
 el.view.textContent = state.tree ? "list" : "tree";
 el.view.setAttribute("aria-pressed", String(state.tree));
 el.view.addEventListener("click", toggleView);

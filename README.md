@@ -436,9 +436,22 @@ the thing being looked at.
 
 ## Filtering, and asking the registry
 
-Typing filters what is already loaded, instantly, and picks the matching text
-out of every name — every occurrence, since a name is a path and the same word
-often appears in more than one segment.
+Both lists have a filter, and it reads what you typed rather than making you
+pick a mode:
+
+| Typed         | Means                                                              |
+| ------------- | ------------------------------------------------------------------ |
+| `kam`         | substring, case-insensitive, every occurrence in the name          |
+| `/kam.*edge/` | a regular expression — `i` unless the flags after it say otherwise |
+| `kmn`         | nothing matched as written, so the characters in order, ranked     |
+
+Fuzzy is a fallback rather than a third syntax, so an exact answer is never
+buried under a loose one and the list is never two kinds of match at once. When
+it is what you are seeing, the count says `fuzzy`; a pattern that will not
+compile filters nothing and shows the engine's own complaint. The ranking
+favours characters that ran together and characters that started a segment —
+`kam` means `kamino` before `okra-machine`. The flat list is in that order; the
+tree cannot be, since its order is the paths.
 
 Behind that, the registry is asked too. Searching is not in the distribution
 spec, so there is no one endpoint: zot serves GraphQL, Docker Hub and friends
@@ -466,9 +479,19 @@ one, so a registry with a hundred pages shows the first immediately. Each redraw
 holds the scroll position, so a list growing underneath you does not move what
 you are reading — new names arrive below, which is where they belong.
 
-It is not infinite scroll: the pages are fetched as fast as the registry answers
-rather than when you reach the bottom. The scrollbar is honest about what has
-arrived, and grows.
+**It is infinite scroll**: a page is fetched when the drawn window comes within
+twenty rows of the end of what has arrived, and the count carries a `+` until
+the walk is over so a number that is not yet the whole number does not claim to
+be. A short page ends it — the spec allows fewer than `n` results only when that
+is all there is or a `Link` says otherwise, which is worth inferring because
+`Link` is usually unreadable in a browser and without it every list paid one
+round trip to be told nothing.
+
+**Typing pulls the rest of the list down.** A filter over the first page is a
+wrong answer, not a partial one, so the walk resumes in the background — nothing
+waits for it, and the matches among what has arrived are drawn at once. The
+registry's own search endpoint is not asked about a `/pattern/`: it takes a
+word, and handing it one would be asking about a repository nobody has.
 
 **The counts beside each list are counted here, not reported.** Neither
 `_catalog` nor `tags/list` has a total in it — the distribution spec has no such
