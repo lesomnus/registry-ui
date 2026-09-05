@@ -327,20 +327,23 @@ like a missing tag rather than a refused one.
 Tick **http** for a registry with no TLS, which is most of them on your own
 machine. The scheme is rewritten on the way out, so nothing above has to know.
 
-One thing worth knowing when reading the code: **blobs are read with
-`raw.json()` and manifests are not.** `blobs.get()` leaves the body unread on
-purpose; `unwrap()` has already read a manifest, and the result *is* the
-manifest, so asking again throws.
+Two things worth knowing when reading the code.
+
+**A request is awaited for the response and unwrapped for the value.** `await`
+on a request gives a `Res` — `raw`, `ok`, and `unwrap()` — so a listing takes
+its items from `unwrap()` and its cursor from a header on `raw` beside it.
+
+**An error response is not a throw.** `ok` is false and `errors` says why, so a
+missing tag reads as `MANIFEST_UNKNOWN` rather than as a number. That is how the
+search decides whether a registry serves a shape at all: a registry that does
+not answers an error, and catching instead would also swallow a network failure
+and conclude the same thing.
 
 ## Installing it
 
-oci-client comes from git rather than npm — npm still has 0.0.1 from 2024, and
-the credential support, the referrers fallback, the paged catalog, `Accept` and
-`Unsecure` this uses are all newer. `npm install` builds it, through the
-package's `prepare`.
-
-The dependency is pinned to a commit in `package-lock.json`. When there is a
-release on npm this goes back to a version range.
+oci-client is `^1.0.0` from npm. It used to be a git dependency pinned to a
+commit, because npm had only 0.0.1 from 2024; there is a release now and the
+workaround is gone.
 
 ## Layout
 

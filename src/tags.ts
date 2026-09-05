@@ -14,8 +14,10 @@ export async function listTags(client: RegistryClient, repository: string, pageS
   let last: string | undefined;
 
   for (let page = 0; page < maxPages; page++) {
-    const res = await client.repo(repository).tags.list({ n: pageSize, last }).unwrap();
-    const tags = res.tags ?? [];
+    // Awaited rather than unwrapped: `unwrap()` answers the value alone, and
+    // the cursor is in a header on the response beside it.
+    const res = await client.repo(repository).tags.list({ n: pageSize, last });
+    const tags = res.unwrap().tags ?? [];
     if (tags.length === 0) {
       break;
     }

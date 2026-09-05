@@ -64,11 +64,14 @@ async function fetchManifest(
     endpoint: { method: "GET", name: repository, resource: "manifests", reference },
   });
 
+  const body = await res.text();
   if (!res.ok) {
-    throw new Error(`${repository}:${reference} answered ${res.status}`);
+    // A registry says why in the body, in the shape the spec gives it. Reading
+    // it turns "404" into "MANIFEST_UNKNOWN", which is the difference between
+    // knowing the tag is gone and knowing only that something went wrong.
+    throw new Error(`${repository}:${reference} — ${describe(body) ?? `the registry answered ${res.status}`}`);
   }
 
-  const body = await res.text();
   const digest = await sha256(body);
   const reported = res.headers.get("Docker-Content-Digest") ?? undefined;
 
@@ -78,6 +81,38 @@ async function fetchManifest(
     mediaType: res.headers.get("Content-Type") ?? "-",
     mismatch: reported !== undefined && reported !== digest ? reported : undefined,
   };
+}
+
+/**
+ * A blob, parsed as JSON.
+ *
+ * Always by digest, so always cacheable: an image config or a signature bundle
+ * read twice is fetched once.
+ *
+ * The client leaves a blob's body unread on purpose, so the response is what
+ * there is to read -- `unwrap()` answers the empty value beside it, and is
+ * called only to turn an error response into a throw.
+ */
+export async function readBlob(client: RegistryClient, repository: string, digest: string): Promise<unknown> {
+  return await cache.get(`${client.domain}/${repository}/blobs@${digest}`, async () => {
+    const res = await client.repo(repository).blobs.get(digest);
+    res.unwrap();
+
+    return await res.raw.json();
+  });
+}
+
+/** What a registry's error body says, if it is one and it says anything. */
+function describe(body: string): string | undefined {
+  try {
+    const errors = (JSON.parse(body) as { errors?: { code?: string; message?: string }[] }).errors;
+    const said = (errors ?? [])
+      .map((error) => error.message ?? error.code)
+      .filter((text): text is string => typeof text === "string" && text !== "");
+    return said.length > 0 ? said.join("; ") : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** `sha256:<hex>`, over the exact bytes. */

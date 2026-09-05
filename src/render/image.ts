@@ -3,7 +3,7 @@ import type { RegistryClient } from "../registry";
 import type { Descriptor } from "./artifact";
 import { artifactName, isSignature, openArtifact } from "./artifact";
 import type { Cell } from "./dom";
-import { readManifest } from "../manifest";
+import { readBlob, readManifest } from "../manifest";
 import { definitions, element, formatSize, shortDigest, table } from "./dom";
 
 type Child = { digest: string; mediaType?: string; platform?: { os?: string; architecture?: string; variant?: string } };
@@ -39,8 +39,8 @@ type Attachment = { descriptor: Descriptor; subjectLabel: string };
 
 async function referrersOf(client: RegistryClient, repository: string, digest: string): Promise<Descriptor[]> {
   try {
-    const res = await client.repo(repository).referrers.get(digest).unwrap();
-    return (res.manifests ?? []) as Descriptor[];
+    const res = await client.repo(repository).referrers.get(digest);
+    return (res.unwrap().manifests ?? []) as Descriptor[];
   } catch {
     // A registry without the referrers API is one that still shows the image.
     return [];
@@ -186,8 +186,7 @@ export async function renderImage(client: RegistryClient, repository: string, re
   let config: Config | undefined;
   if (manifest.config?.digest) {
     try {
-      const blob = await client.repo(repository).blobs.get(manifest.config.digest).unwrap();
-      config = (await blob.raw.json()) as Config;
+      config = (await readBlob(client, repository, manifest.config.digest)) as Config;
     } catch {
       config = undefined;
     }

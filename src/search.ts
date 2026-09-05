@@ -55,19 +55,25 @@ export class Search {
     }
     if (this.flavour !== undefined) {
       const client = this.flavour === "zot" ? this.zot : this.v1;
-      return { repositories: await this.ask(client, query, limit), flavour: this.flavour };
+      return { repositories: (await this.ask(client, query, limit)) ?? [], flavour: this.flavour };
     }
 
     for (const [flavour, client] of [
       ["zot", this.zot],
       ["v1", this.v1],
     ] as const) {
+      let repositories: RepoSummary[] | undefined;
       try {
-        const repositories = await this.ask(client, query, limit);
+        repositories = await this.ask(client, query, limit);
+      } catch {
+        // Not a response at all -- a shape the registry does not serve can fail
+        // before it can answer. Try the other one before concluding anything.
+        continue;
+      }
+
+      if (repositories !== undefined) {
         this.flavour = flavour;
         return { repositories, flavour };
-      } catch {
-        // Not this shape. The next one, or none.
       }
     }
 
@@ -75,12 +81,20 @@ export class Search {
     return { repositories: [], flavour: "none" };
   }
 
+  /**
+   * Asks one shape, and says whether it was the right one.
+   *
+   * A registry that does not serve this answers an error rather than throwing,
+   * so `ok` is what tells the two apart -- reading it is not the same as
+   * catching, which would also swallow a network failure and conclude the
+   * registry cannot search.
+   */
   private async ask(
     client: InstanceType<typeof Zot> | InstanceType<typeof V1>,
     query: string,
     limit: number,
-  ): Promise<RepoSummary[]> {
-    const res = await client.search(query, { n: limit }).unwrap();
-    return res.repositories ?? [];
+  ): Promise<RepoSummary[] | undefined> {
+    const res = await client.search(query, { n: limit });
+    return res.ok ? (res.value.repositories ?? []) : undefined;
   }
 }

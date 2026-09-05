@@ -26,8 +26,10 @@ export async function listRepositories(
   let last: string | undefined;
 
   for (let page = 0; page < maxPages; page++) {
-    const res = await client.catalog({ n: pageSize, last }).unwrap();
-    const repositories = res.repositories ?? [];
+    // Awaited rather than unwrapped: `unwrap()` answers the value alone, and
+    // the cursor is in a header on the response beside it.
+    const res = await client.catalog({ n: pageSize, last });
+    const repositories = res.unwrap().repositories ?? [];
     if (repositories.length === 0) {
       break;
     }

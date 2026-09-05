@@ -14,7 +14,7 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@lesomnus/oci-client": "github:lesomnus/oci-client"
+    "@lesomnus/oci-client": "^1.0.0"
   },
   "devDependencies": {
     "@types/bun": "^1.3.14",
