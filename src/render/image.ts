@@ -110,7 +110,7 @@ export async function renderImage(client: RegistryClient, repository: string, re
   // Read for its bytes, so the digest is computed rather than taken on trust --
   // a browser usually cannot read `Docker-Content-Digest` at all. See manifest.ts.
   const read = await readManifest(client, repository, reference);
-  const { digest, mediaType, mismatch } = read;
+  const { digest, mediaType, mismatch, digestNote } = read;
   const manifest = read.manifest as Manifest;
 
   const fragment = document.createDocumentFragment();
@@ -121,8 +121,16 @@ export async function renderImage(client: RegistryClient, repository: string, re
   // problem to solve, and very much its problem to mention.
   if (mismatch !== undefined) {
     fragment.append(
-      element("p", "error", `the registry reports ${shortDigest(mismatch)} for these bytes, which hash to ${shortDigest(digest)}`),
+      element(
+        "p",
+        "error",
+        `the registry reports ${shortDigest(mismatch)} for these bytes, which hash to ${shortDigest(digest)}`,
+      ),
     );
+  }
+
+  if (digestNote !== undefined) {
+    fragment.append(element("p", "empty", digestNote));
   }
 
   if (indexMediaTypes.has(mediaType)) {
@@ -163,7 +171,8 @@ export async function renderImage(client: RegistryClient, repository: string, re
 
     // An index can be signed at the index and again at each platform below it.
     // Asking only the index would call a per-platform-signed image unsigned.
-    const subjects = [{ digest, label: "index" }].concat(
+    // Referrers hang off a digest; without one there is nothing to ask about.
+    const subjects = (digest === undefined ? [] : [{ digest, label: "index" }]).concat(
       children.map((child) => ({
         digest: child.digest,
         label: isAttestation(child) ? "attestation" : platformName(child.platform),
@@ -226,10 +235,13 @@ export async function renderImage(client: RegistryClient, repository: string, re
     ),
   );
 
-  const attachments = (await referrersOf(client, repository, digest)).map((descriptor) => ({
-    descriptor,
-    subjectLabel: "image",
-  }));
+  const attachments =
+    digest === undefined
+      ? []
+      : (await referrersOf(client, repository, digest)).map((descriptor) => ({
+          descriptor,
+          subjectLabel: "image",
+        }));
 
   badge.replaceChildren(signedBadge(attachments));
   fragment.append(attachedSection(client, repository, attachments, false));

@@ -23,10 +23,13 @@ import type { RegistryClient } from "./registry";
 
 export type ReadManifest = {
   manifest: unknown;
-  digest: string;
+  /** Absent when it could be neither computed nor read. See `digestOf`. */
+  digest?: string;
   mediaType: string;
   /** Set when the registry named a digest and it was not the one the bytes have. */
   mismatch?: string;
+  /** Said on the page when the digest had to be taken on trust, or is missing. */
+  digestNote?: string;
 };
 
 /**
@@ -72,15 +75,41 @@ async function fetchManifest(
     throw new Error(`${repository}:${reference} — ${describe(body) ?? `the registry answered ${res.status}`}`);
   }
 
-  const digest = await sha256(body);
   const reported = res.headers.get("Docker-Content-Digest") ?? undefined;
+  const { digest, mismatch, note } = await digestOf(body, reported);
 
   return {
     manifest: JSON.parse(body) as unknown,
     digest,
     mediaType: res.headers.get("Content-Type") ?? "-",
-    mismatch: reported !== undefined && reported !== digest ? reported : undefined,
+    mismatch,
+    digestNote: note,
   };
+}
+
+/**
+ * The digest of these bytes, computed where that is possible and taken on trust
+ * where it is not.
+ *
+ * `crypto.subtle` exists only in a secure context -- https, or localhost. A
+ * page served over plain http from anywhere else does not have it, and a
+ * registry UI running on an internal host without TLS is exactly that. So the
+ * computation is attempted and its absence is a missing field rather than a
+ * failed page: the digest is one line of the answer, and everything else about
+ * the image is still worth showing.
+ */
+async function digestOf(
+  body: string,
+  reported: string | undefined,
+): Promise<{ digest?: string; mismatch?: string; note?: string }> {
+  if (globalThis.crypto?.subtle === undefined) {
+    return reported === undefined
+      ? { note: "no digest: the registry did not expose one and this page cannot compute it over plain http" }
+      : { digest: reported, note: "digest as the registry reports it, unverified: computing one needs https" };
+  }
+
+  const digest = await sha256(body);
+  return { digest, mismatch: reported !== undefined && reported !== digest ? reported : undefined };
 }
 
 /**

@@ -239,6 +239,11 @@ handled rather than reported:
   and the bytes are right here, so trusting a header was never necessary. When
   the header *is* readable it is checked, and a registry naming a digest its own
   bytes do not have is said out loud.
+
+  Computing needs `crypto.subtle`, which browsers give only to a **secure
+  context** — https, or localhost. Served over plain http from anywhere else,
+  the page falls back to the reported digest and says it is unverified, or says
+  there is none. It is one line of the answer, not the answer.
 - **Paging falls back to the last name returned** when `Link` cannot be read,
   which is what the spec says to send back anyway. A page that adds nothing new
   ends the walk, so a registry whose cursor is not a name stops rather than
