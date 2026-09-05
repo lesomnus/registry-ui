@@ -19,6 +19,11 @@
   --ok: #1a7f4b;
   --warn: #9a6700;
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --tok-key: #1a5fb4;
+  --tok-string: #1a7f4b;
+  --tok-number: #9a4b00;
+  --tok-literal: #7b3fb8;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -34,6 +39,11 @@
     --accent-soft: #1b2739;
     --ok: #4ec98a;
     --warn: #d9a441;
+
+    --tok-key: #8ab4ff;
+    --tok-string: #7fd6a4;
+    --tok-number: #e0a26a;
+    --tok-literal: #c9a0ff;
   }
 }
 
@@ -42,6 +52,11 @@
 }
 
 body {
+  /* A column, so `main` takes what is left rather than what a constant guesses
+     the header is tall. The header changed height twice; the constant did not. */
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
   margin: 0;
   background: var(--bg-sunken);
   color: var(--text);
@@ -54,43 +69,108 @@ body {
 }
 
 header {
-  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: none;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--border);
   background: var(--bg);
 }
 
+/*
+ * The slot holds the closed shape; the form floats inside it.
+ *
+ * Everything here exists to keep one promise: the domain text is in the same
+ * place whether the form is open or shut. The form is out of flow and pinned to
+ * the slot's top-left, its padding never changes, and the input's border is
+ * transparent when closed rather than removed -- so opening adds paint and
+ * siblings and moves nothing.
+ */
+#connection-slot {
+  position: relative;
+  flex: none;
+  width: 300px;
+  height: 32px;
+}
+
 #connection {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  width: 300px;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+#connection.open {
+  width: 340px;
+  background: var(--bg-raised);
+  box-shadow:
+    0 0 0 1px var(--border-strong),
+    0 18px 44px rgb(0 0 0 / 22%);
 }
 
 #connection input[type="text"],
 #connection input[type="password"] {
-  padding: 6px 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  background: var(--bg-raised);
+  display: block;
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
   color: inherit;
   font: inherit;
   font-size: 13px;
 }
 
 #domain {
-  flex: 1 1 240px;
-  min-width: 180px;
+  font-family: var(--mono);
+  text-overflow: ellipsis;
+}
+
+#domain:read-only {
+  cursor: default;
+}
+
+#connection.open input[type="text"],
+#connection.open input[type="password"] {
+  border-color: var(--border-strong);
+  background: var(--bg);
+}
+
+#connection.open #domain:read-only {
+  border-color: transparent;
+  background: transparent;
+}
+
+#connection-more {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+}
+
+#username,
+#password,
+#forwarder {
   font-family: var(--mono);
 }
 
-#forwarder {
-  flex: 1 1 180px;
-  min-width: 140px;
-  font-family: var(--mono);
+.connection-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.connection-row .spacer {
+  flex: 1;
 }
 
 #connection button[type="submit"] {
-  padding: 7px 14px;
+  padding: 5px 14px;
   border: 1px solid var(--accent);
   border-radius: 6px;
   background: var(--accent);
@@ -98,6 +178,14 @@ header {
   font: inherit;
   font-size: 13px;
   cursor: pointer;
+}
+
+/* Dims what is behind an open form, and catches the click that shuts it. */
+#scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgb(0 0 0 / 24%);
 }
 
 .direct {
@@ -110,10 +198,15 @@ header {
 }
 
 .status {
-  margin: 8px 0 0;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
   color: var(--text-muted);
   font-size: 12px;
   font-family: var(--mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .status.error {
@@ -124,12 +217,26 @@ header {
   color: var(--warn);
 }
 
+/*
+ * The two lists are fixed and the image pane takes the rest.
+ *
+ * They were fractions, which on a wide screen spent half the window on two
+ * columns of short names. A repository name and a tag have a length; the
+ * manifest below them does not.
+ */
 main {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(200px, 1fr) minmax(340px, 2fr);
+  grid-template-columns: 300px 200px minmax(0, 1fr);
   gap: 1px;
+  flex: 1;
+  min-height: 0;
   background: var(--border);
-  height: calc(100vh - 96px);
+}
+
+@media (max-width: 860px) {
+  main {
+    grid-template-columns: 200px 150px minmax(0, 1fr);
+  }
 }
 
 .pane {
@@ -454,6 +561,34 @@ pre.raw {
   tab-size: 2;
 }
 
+/*
+ * Four colours, which is what two languages need.
+ *
+ * A key, a string, a number and a literal are the whole of JSON, and YAML adds
+ * a comment. Anything more would be colouring for its own sake in a pane that
+ * exists to be read once.
+ */
+.tok-key {
+  color: var(--tok-key);
+}
+
+.tok-string {
+  color: var(--tok-string);
+}
+
+.tok-number {
+  color: var(--tok-number);
+}
+
+.tok-literal {
+  color: var(--tok-literal);
+}
+
+.tok-comment {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 /* The toggle beside a heading is not part of the heading. */
 h3 .linklike {
   margin-left: 8px;
@@ -517,8 +652,8 @@ a.external {
 #brand {
   display: flex;
   align-items: center;
+  flex: none;
   gap: 8px;
-  margin-bottom: 10px;
 }
 
 #logo {

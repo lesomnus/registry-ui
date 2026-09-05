@@ -3,7 +3,7 @@ import { isDigest } from "./cache";
 import { listRepositories } from "./catalog";
 import { loadConfig, usableLogo, type PageConfig } from "./config";
 import { cache } from "./manifest";
-import { listAnchor, renderList, scrollListTo } from "./render/list";
+import { listAnchor, renderList, rowHeight, scrollListTo } from "./render/list";
 import { ancestorsOf, buildTree, flattenTree } from "./render/tree";
 import { listTags } from "./tags";
 import { connect, connectionOf, type Connection, type RegistryClient } from "./registry";
@@ -22,7 +22,9 @@ const el = {
   forwarder: document.getElementById("forwarder") as HTMLInputElement,
   open: document.getElementById("open") as HTMLButtonElement,
   reset: document.getElementById("reset") as HTMLButtonElement,
-  fixed: document.getElementById("fixed") as HTMLElement,
+  slot: document.getElementById("connection-slot") as HTMLElement,
+  more: document.getElementById("connection-more") as HTMLElement,
+  scrim: document.getElementById("scrim") as HTMLElement,
   insecureLabel: document.getElementById("insecure-label") as HTMLElement,
   directLabel: document.getElementById("direct-label") as HTMLElement,
   brand: document.getElementById("brand") as HTMLElement,
@@ -73,7 +75,11 @@ const state: {
   repositories: [],
   tags: [],
   generation: 0,
-  tree: false,
+  // Grouped by default. Two hundred repositories flat is a list you scroll
+  // looking for a prefix you already know; the same names as thirty groups is
+  // one you read. The flat list is a click away and the choice is not kept,
+  // because the tree is the better answer for the next registry too.
+  tree: true,
   expanded: new Set(),
   found: new Map(),
   foundFor: "",
@@ -158,10 +164,11 @@ function applyBranding(config: PageConfig): void {
 /**
  * Fixes the connection, for a deployment that exists to browse one registry.
  *
- * The boxes go away and the registry is stated instead. Credentials stay --
- * which registry to read is a decision the deployment made, and who is reading
- * is not -- unless it is also marked anonymous, in which case there is nothing
- * left to fill in and the form goes entirely.
+ * The registry becomes something to read rather than something to type, and
+ * everything about how to reach it goes with it. Credentials stay -- which
+ * registry to read is a decision the deployment made, and who is reading is not
+ * -- unless it is also marked anonymous, in which case there is nothing left to
+ * fill in and the form has nothing to open.
  *
  * Worth being plain about: this is presentation. The page runs in a browser and
  * anybody who opens the console can ask any registry anything their network and
@@ -169,23 +176,51 @@ function applyBranding(config: PageConfig): void {
  * for, not somebody who means to use it.
  */
 function applyLock(config: PageConfig): void {
-  el.fixed.hidden = true;
   if (config.locked !== true) {
     return;
   }
 
-  for (const node of [el.domain, el.forwarder, el.insecureLabel, el.directLabel]) {
+  el.domain.readOnly = true;
+  for (const node of [el.forwarder, el.insecureLabel, el.directLabel]) {
     node.hidden = true;
   }
 
-  el.fixed.textContent = config.domain ?? "";
-  el.fixed.hidden = false;
-
   if (config.anonymous === true) {
-    el.username.hidden = true;
-    el.password.hidden = true;
-    el.open.hidden = true;
-    el.reset.hidden = true;
+    el.more.hidden = true;
+  }
+}
+
+/**
+ * Whether the form has anything to show beyond the registry it is already
+ * showing. A locked, anonymous deployment does not, so nothing opens.
+ */
+const openable = (): boolean => !el.more.hidden;
+
+/**
+ * Opens and shuts the connection form.
+ *
+ * It cannot be shut before there is a connection: an empty page behind a
+ * dismissed form is a dead end, and the form is the only thing on it worth
+ * touching. So this is also what states the initial condition -- not connected
+ * means open, and no separate flag says so.
+ */
+function showConnection(open: boolean): void {
+  const wanted = open && openable();
+  el.form.classList.toggle("open", wanted);
+  el.scrim.hidden = !wanted;
+  el.domain.setAttribute("aria-expanded", String(wanted));
+
+  if (wanted) {
+    (el.domain.readOnly ? el.username : el.domain).focus();
+  }
+}
+
+const connectionIsOpen = (): boolean => el.form.classList.contains("open");
+
+/** Shut only when there is something behind it to look at. */
+function closeConnection(): void {
+  if (state.client !== undefined) {
+    showConnection(false);
   }
 }
 
@@ -371,6 +406,31 @@ function renderTags(): void {
 const message = (error: unknown): string => String((error as Error).message ?? error);
 
 /**
+ * Redraws the repository list with `name` selected, and puts it where it can be
+ * seen if it is not already.
+ *
+ * A pasted link names a repository the list has never been scrolled to, and in
+ * the tree it may be inside groups nobody has opened -- so the groups above it
+ * are opened and the list is scrolled to it. Only when it was not already on
+ * screen: clicking a row you can see should not move it.
+ */
+function revealRepository(name: string): void {
+  const held = listAnchor(el.repositoryList, name);
+  const onScreen = held !== undefined && held.offset >= 0 && held.offset <= el.repositoryList.clientHeight - rowHeight;
+
+  if (state.tree) {
+    for (const group of ancestorsOf(name)) {
+      state.expanded.add(group);
+    }
+  }
+
+  renderRepositories();
+  if (!onScreen) {
+    scrollListTo(el.repositoryList, { key: name, offset: 96 });
+  }
+}
+
+/**
  * What is on screen, said as the reference it is.
  *
  * A manifest opened from an index would otherwise be an unlabelled table of
@@ -505,14 +565,16 @@ async function applyRoute(): Promise<void> {
     state.tags = [];
     state.reference = undefined;
     state.via = undefined;
-    renderRepositories();
     el.detail.replaceChildren(element("p", "empty", "Pick a tag."));
 
     if (route.repository === undefined) {
+      renderRepositories();
       el.tagList.replaceChildren(element("p", "empty", "Pick a repository."));
       el.tagCount.textContent = "";
       return;
     }
+
+    revealRepository(route.repository);
 
     await loadTags(route.repository, generation);
     if (generation !== state.generation) {
@@ -564,8 +626,13 @@ function connectionFromForm(): Connection | undefined {
 /** Connects, then lets the address say what to open on the other side. */
 async function reconnect(connection: Connection, route: Route): Promise<void> {
   if (!(await open(connection))) {
+    // Left open, and on the registry that did not answer: the next thing to do
+    // is to correct it, and that is the field somebody is already looking at.
+    showConnection(true);
     return;
   }
+
+  showConnection(false);
 
   history.replaceState({}, "", formatRoute({ ...route, domain: connection.domain }));
   await refresh();
@@ -601,6 +668,10 @@ async function open(connection: Connection): Promise<boolean> {
     // not a registry, or you cannot reach it", rather than "it will not list".
     await client.ping().unwrap();
   } catch (error) {
+    // Not connected, and said so in the one place that decides whether the
+    // connection form may be dismissed: a form shut onto a page with nothing
+    // behind it is a dead end.
+    state.client = undefined;
     el.status.textContent = `${connection.domain} did not answer as a registry: ${message(error)}`;
     el.status.className = "status error";
     el.repositoryList.replaceChildren();
@@ -728,7 +799,26 @@ function onFilterInput(): void {
   }, 250);
 }
 
+el.domain.addEventListener("focus", () => showConnection(true));
+el.domain.addEventListener("mousedown", (event) => {
+  // A read-only registry is a label. Clicking it opens the form for the parts
+  // that are still yours to change, and does not put a caret in it.
+  if (el.domain.readOnly) {
+    event.preventDefault();
+    showConnection(!connectionIsOpen());
+  }
+});
+
+el.scrim.addEventListener("mousedown", closeConnection);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && connectionIsOpen()) {
+    closeConnection();
+  }
+});
+
 el.filter.addEventListener("input", onFilterInput);
+el.view.textContent = state.tree ? "list" : "tree";
+el.view.setAttribute("aria-pressed", String(state.tree));
 el.view.addEventListener("click", toggleView);
 el.reset.addEventListener("click", forget);
 
@@ -755,7 +845,10 @@ void loadConfig().then(async (config) => {
   // A deployment that names a registry means to be opened on it, rather than to
   // ask the person to press the button that was already filled in for them.
   const connection = connectionFromForm();
-  if (connection !== undefined) {
-    await reconnect(connection, route);
+  if (connection === undefined) {
+    showConnection(true);
+    return;
   }
+
+  await reconnect(connection, route);
 });

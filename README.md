@@ -81,6 +81,16 @@ a view — the size is checked from `Content-Length` before the body is read, so
 refusing one costs nothing. A blob the registry answers with a redirect to
 storage that sends no CORS headers will fail, and says so on the button.
 
+JSON and YAML are coloured. The highlighter is written here rather than pulled
+in: highlight.js with those two languages is around 40 KB gzipped and this whole
+app is 20, which is the wrong trade for a pane most sessions never open — and
+what a registry holds is not the general case. JSON gets a real tokenizer, YAML
+a line-based one that marks only what is unambiguous at the start of a line,
+and everything else is shown plain. Above 256 KiB the colour goes and the pane
+says so: highlighting is an element per token, and a megabyte of JSON is a few
+hundred thousand of them. Nodes are built rather than markup assembled — a blob
+is bytes somebody else pushed, and it goes nowhere near `innerHTML`.
+
 The manifest itself is at the bottom of every image, behind **show**. Everything
 above it is this page's reading of the manifest, and a reading leaves things
 out; those are also the exact bytes the digest was computed over.
@@ -89,6 +99,26 @@ out; those are also the exact bytes the digest was computed over.
 the chain, not the dates, not the signature. It reports what a signature claims
 about itself, and `cosign verify` or `notation verify` is what decides whether
 to believe it.
+
+## The registry, and the room it takes up
+
+There is one row at the top: a logo if the deployment has one, the registry, and
+what it last said. The registry is the connection form — it does not sit beside
+it. Clicking it opens the rest downward over the page, and **the domain does not
+move by a pixel** when it does: the form is out of flow in a slot of the closed
+size, its padding is the same in both states, and the input's border is
+transparent when shut rather than absent. Opening adds paint and siblings and
+shifts nothing.
+
+It cannot be dismissed before there is a connection, which is also how the first
+visit states itself — no registry means the form is the page, with no separate
+flag saying so. A registry that answers as something other than a registry
+leaves it open too, on the field you are about to correct.
+
+The two lists are a fixed width and the image pane takes the rest. They were
+fractions, which on a wide screen spent half the window on two columns of short
+names: a repository name and a tag have a length, and the manifest below them
+does not.
 
 ## The address is a reference
 
@@ -343,9 +373,16 @@ given `REGISTRY_DIRECT=false`.
 ## Two views of the same names
 
 Repository names are paths — `dist/hday/kamino`, `dist/hday/lens` — and a flat
-list of a few hundred of them hides what the shared prefixes mean. **tree**
-draws them once. A run of single-child groups is folded into one row, so
-`dist/external/docker.io/library` is one line rather than four clicks.
+list of a few hundred of them hides what the shared prefixes mean. The tree
+draws them once, and is what you land on: two hundred names flat is a list you
+scroll looking for a prefix you already know, and the same names as thirty
+groups is one you read. **list** is a click away. A run of single-child groups
+is folded into one row, so `dist/external/docker.io/library` is one line rather
+than four clicks.
+
+A repository named in the address is revealed rather than merely selected — the
+groups above it are opened and the list scrolls to it, unless it was already on
+screen, because a row you can see should not move when you click it.
 
 **Switching keeps your place.** The row at the top of the viewport is put back
 under the same pixel: going to the tree opens whatever groups have to be open
@@ -483,6 +520,7 @@ src/catalog.ts       the repository list, followed to the end
 src/route.ts         the address bar, parsed as an image reference
 src/certificate.ts   the Fulcio extensions, read out of DER
 src/render/blob.ts   the layers, as things to view and to save
+src/render/highlight.ts  JSON and YAML, coloured without a dependency
 src/render/          dom helpers, the image view, the artifact renderers
 server/main.ts       the page, and the forwarder
 ```

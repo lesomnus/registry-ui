@@ -8,26 +8,56 @@
   <body>
     <header>
       <div id="brand" hidden><img id="logo" alt="" hidden /><span id="title"></span></div>
-      <form id="connection">
-        <span id="fixed" hidden=""></span>
-        <input id="domain" type="text" placeholder="registry.example, or localhost:5000" autocomplete="off" spellcheck="false" />
-        <input id="username" type="text" placeholder="username" autocomplete="username" />
-        <input id="password" type="password" placeholder="password or token" autocomplete="current-password" />
-        <input id="forwarder" type="text" placeholder="forwarder URL (only if not direct)" autocomplete="off" spellcheck="false" />
-        <label class="direct" id="insecure-label"><input id="insecure" type="checkbox" /> http</label>
-        <label class="direct" id="direct-label"><input id="direct" type="checkbox" /> direct</label>
-        <button id="open" type="submit">Open</button>
-        <button id="reset" class="toggle" type="button" title="Forget what this browser remembers">reset</button>
-      </form>
+
+      <!--
+        The domain is the only part of this that is ever on screen, and it does
+        not move when the rest appears: the form is absolutely positioned in a
+        slot of the closed size, its padding is the same in both states, and the
+        input's border is transparent rather than absent. So "open" adds a
+        background and some siblings and shifts nothing.
+      -->
+      <div id="connection-slot">
+        <form id="connection">
+          <input
+            id="domain"
+            type="text"
+            placeholder="registry.example, or localhost:5000"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="Registry"
+          />
+          <div id="connection-more">
+            <input id="username" type="text" placeholder="username" autocomplete="username" />
+            <input id="password" type="password" placeholder="password or token" autocomplete="current-password" />
+            <input
+              id="forwarder"
+              type="text"
+              placeholder="forwarder URL (only if not direct)"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <div class="connection-row">
+              <label class="direct" id="insecure-label"><input id="insecure" type="checkbox" /> http</label>
+              <label class="direct" id="direct-label"><input id="direct" type="checkbox" /> direct</label>
+              <span class="spacer"></span>
+              <button id="reset" class="toggle" type="button" title="Forget what this browser remembers">reset</button>
+              <button id="open" type="submit">Open</button>
+            </div>
+          </div>
+        </form>
+      </div>
+
       <p id="status" class="status">Enter a registry.</p>
     </header>
+    <div id="scrim" hidden></div>
 
     <main>
       <section class="pane">
         <div class="pane-head">
           <h2>Repositories</h2>
           <span class="count" id="repository-count"></span>
-          <button id="view-toggle" class="toggle" type="button" aria-pressed="false" title="Group by prefix">tree</button>
+          <!-- Label and pressed state are set from the state it toggles. -->
+          <button id="view-toggle" class="toggle" type="button" title="Group by prefix, or list every name"></button>
         </div>
         <input id="repository-filter" type="search" placeholder="Filter repositories" autocomplete="off" />
         <div class="list" id="repository-list"><p class="empty">Not connected.</p></div>

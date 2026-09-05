@@ -3,6 +3,7 @@ import { extensionFor, isJson, isTextual } from "../media-types";
 import type { RegistryClient } from "../registry";
 import type { Cell } from "./dom";
 import { element, formatSize, shortDigest, table } from "./dom";
+import { highlight } from "./highlight";
 
 /** A layer, as every manifest shape here describes one. */
 export type Layer = {
@@ -56,11 +57,19 @@ const message = (error: unknown): string => String((error as Error).message ?? e
 /** A pane of text, sized to the panel and scrolling rather than growing it. */
 export function rawPane(text: string, mediaType: string | undefined, note?: string): Node {
   const fragment = document.createDocumentFragment();
-  if (note !== undefined) {
-    fragment.append(element("p", "empty", note));
+  const body = pretty(text, mediaType);
+  const { nodes, language, tooLarge } = highlight(body, mediaType);
+
+  const notes = [note, tooLarge ? `Too large to highlight, so this is ${language ?? "plain"} without colour.` : undefined]
+    .filter((line): line is string => line !== undefined)
+    .join(" ");
+  if (notes !== "") {
+    fragment.append(element("p", "empty", notes));
   }
 
-  fragment.append(element("pre", "raw", pretty(text, mediaType)));
+  const pre = element("pre", "raw");
+  pre.append(nodes);
+  fragment.append(pre);
   return fragment;
 }
 
