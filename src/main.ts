@@ -1,16 +1,17 @@
 import "./style.css";
 import { isDigest } from "./cache";
-import { listRepositories } from "./catalog";
+import { repositoryPage } from "./catalog";
 import { loadConfig, usableLogo, type PageConfig } from "./config";
 import { cache } from "./manifest";
 import { listAnchor, renderList, rowHeight, scrollListTo } from "./render/list";
 import { ancestorsOf, buildTree, flattenTree } from "./render/tree";
-import { listTags } from "./tags";
+import { tagPage } from "./tags";
 import { connect, connectionOf, type Connection, type RegistryClient } from "./registry";
 import { Search, type RepoSummary } from "./search";
 import { rawPane } from "./render/blob";
 import { element, shortDigest } from "./render/dom";
 import { renderImage } from "./render/image";
+import { pager, type Pager } from "./pager";
 import { formatRoute, parseRoute, type Route } from "./route";
 
 const el = {
@@ -53,8 +54,11 @@ const state: {
   /** The deployment fixed the registry, so the address may not change it. */
   locked: boolean;
   repositories: string[];
+  /** Asks the registry for the next page of them, when one is wanted. */
+  catalog?: Pager<string>;
   repository?: string;
   tags: string[];
+  tagsOf?: Pager<string>;
   /** What the image pane shows: a tag, or the digest of something below one. */
   reference?: string;
   /**
@@ -296,8 +300,15 @@ function renderRepositories(): void {
 
   const shown = [...local, ...remoteOnly];
 
+  // A trailing `+` for a list that is not all here yet: the number is what has
+  // arrived, and saying it flat would be claiming the registry has that many.
+  const more = state.catalog?.done === false ? "+" : "";
   el.repositoryCount.textContent =
-    shown.length === state.repositories.length ? `${shown.length}` : `${shown.length}/${state.repositories.length}`;
+    shown.length === state.repositories.length
+      ? `${shown.length}${more}`
+      : `${shown.length}/${state.repositories.length}${more}`;
+
+  const wantMore = () => void state.catalog?.more();
 
   const empty = filter ? "Nothing matches." : "No repositories.";
   if (!state.tree) {
@@ -313,6 +324,7 @@ function renderRepositories(): void {
         onSelect: () => go({ repository: name }),
       })),
       empty,
+      wantMore,
     );
     return;
   }
@@ -343,6 +355,7 @@ function renderRepositories(): void {
       },
     ),
     empty,
+    wantMore,
   );
 }
 
@@ -393,7 +406,8 @@ function selectedTag(): string | undefined {
 }
 
 function renderTags(): void {
-  el.tagCount.textContent = `${state.tags.length}`;
+  const page = state.tagsOf;
+  el.tagCount.textContent = `${state.tags.length}${page?.done === false ? "+" : ""}`;
   const current = selectedTag();
   renderList(
     el.tagList,
@@ -404,6 +418,7 @@ function renderTags(): void {
       onSelect: () => go({ repository: state.repository, reference: tag }),
     })),
     "No tags.",
+    () => void page?.more(),
   );
 }
 
@@ -556,13 +571,31 @@ async function loadTags(repository: string, generation: number): Promise<void> {
   el.tagList.replaceChildren(element("p", "loading", "Loading..."));
   el.tagCount.textContent = "";
 
+  const page = pager<string>(
+    (cursor) => tagPage(client, repository, cursor),
+    () => {
+      if (generation !== state.generation) {
+        return;
+      }
+
+      const held = listAnchor(el.tagList);
+      state.tags = page.items;
+      renderTags();
+      if (held !== undefined) {
+        scrollListTo(el.tagList, held);
+      }
+    },
+    (a, b) => a.localeCompare(b),
+  );
+
+  state.tagsOf = page;
+
   try {
-    const tags = await listTags(client, repository);
+    await page.more();
     if (generation !== state.generation) {
       return;
     }
 
-    state.tags = tags.sort();
     renderTags();
   } catch (error) {
     if (generation !== state.generation) {
@@ -672,6 +705,7 @@ async function applyRoute(): Promise<void> {
   if (route.repository !== state.repository) {
     state.repository = route.repository;
     state.tags = [];
+    state.tagsOf = undefined;
     state.reference = undefined;
     state.via = undefined;
     el.detail.replaceChildren(element("p", "empty", "Pick a tag."));
@@ -806,23 +840,32 @@ async function open(connection: Connection): Promise<boolean> {
  * was started for is still the one in use.
  */
 async function list(client: RegistryClient): Promise<void> {
-  try {
-    // Drawn as the pages arrive. The scroll position is held across each
-    // redraw, so a list growing underneath somebody does not move what they are
-    // reading -- new names arrive below, which is where they belong.
-    await listRepositories(client, (repositories) => {
+  const page = pager<string>(
+    (cursor) => repositoryPage(client, cursor),
+    () => {
       if (state.client !== client) {
         return;
       }
 
+      // Drawn as each page arrives, holding the scroll: `_catalog` is not
+      // ordered by any spec, so a late name can land above the one being read,
+      // and the anchor is what keeps it from moving.
       const held = listAnchor(el.repositoryList);
-      state.repositories = [...repositories].sort();
+      state.repositories = page.items;
       renderRepositories();
       if (held !== undefined) {
         scrollListTo(el.repositoryList, held);
       }
-    });
+    },
+    (a, b) => a.localeCompare(b),
+  );
 
+  state.catalog = page;
+
+  try {
+    // Only the first. The rest are asked for by the list as it nears the end of
+    // what it has, and by the filter, which needs all of them to be right.
+    await page.more();
     if (state.client !== client) {
       return;
     }
@@ -870,8 +913,31 @@ el.form.addEventListener("submit", (event) => {
  */
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
+/**
+ * A filter over part of a list is a wrong answer, not a partial one.
+ *
+ * Browsing wants one page; searching wants all of them. So typing pulls the
+ * rest down in the background, and the count keeps its `+` until it is really
+ * all here. Nothing waits for it: the matches among what has arrived are drawn
+ * immediately and the rest join them as they come.
+ */
+function drain(page: Pager<string> | undefined, redraw: () => void): void {
+  if (page === undefined || page.done) {
+    return;
+  }
+
+  void page.drain().then(redraw, () => {
+    // A page that failed mid-walk leaves what arrived, which is still worth
+    // filtering; the list says how much of it there is.
+    redraw();
+  });
+}
+
 function onFilterInput(): void {
   renderRepositories();
+  if (el.filter.value.trim() !== "") {
+    drain(state.catalog, renderRepositories);
+  }
 
   const query = el.filter.value.trim();
   if (searchTimer !== undefined) {

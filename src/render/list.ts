@@ -59,7 +59,7 @@ export type Anchor = {
 };
 
 type Mounted = {
-  render: (rows: Row[]) => void;
+  render: (rows: Row[], onNearEnd?: () => void) => void;
   anchor: (key?: string) => Anchor | undefined;
   scrollTo: (anchor: Anchor) => void;
 };
@@ -72,7 +72,7 @@ const mounted = new WeakMap<HTMLElement, Mounted>();
  * The scroll listener is attached once per container and kept, so calling this
  * again with a new list is a redraw rather than a rebuild.
  */
-export function renderList(container: HTMLElement, rows: Row[], emptyMessage: string): void {
+export function renderList(container: HTMLElement, rows: Row[], emptyMessage: string, onNearEnd?: () => void): void {
   let state = mounted.get(container);
   if (state === undefined) {
     state = mount(container);
@@ -81,10 +81,13 @@ export function renderList(container: HTMLElement, rows: Row[], emptyMessage: st
 
   if (rows.length === 0) {
     container.replaceChildren(paragraph(emptyMessage));
+    // Still asked: an empty list may be a list whose first page has not
+    // arrived, and nothing else would ever ask for it.
+    onNearEnd?.();
     return;
   }
 
-  state.render(rows);
+  state.render(rows, onNearEnd);
 }
 
 /**
@@ -119,6 +122,7 @@ function mount(container: HTMLElement): Mounted {
   sizer.append(window_);
 
   let current: Row[] = [];
+  let wantMore: (() => void) | undefined;
   let drawnFrom = -1;
   let drawnTo = -1;
 
@@ -136,6 +140,12 @@ function mount(container: HTMLElement): Mounted {
     drawnTo = last;
     window_.style.transform = `translateY(${first * rowHeight}px)`;
     window_.replaceChildren(...current.slice(first, last).map(rowElement));
+
+    // Asked on every draw rather than debounced here: the pager already refuses
+    // to have two pages in flight, so an extra ask is a function call.
+    if (wantMore !== undefined && last >= current.length - nearEnd) {
+      wantMore();
+    }
   };
 
   let scheduled = false;
@@ -153,13 +163,24 @@ function mount(container: HTMLElement): Mounted {
   });
 
   return {
-    render(rows: Row[]) {
+    render(rows: Row[], onNearEnd?: () => void) {
       const replaced = container.firstChild !== sizer;
       current = rows;
+      wantMore = onNearEnd;
       sizer.style.height = `${rows.length * rowHeight}px`;
       if (replaced) {
         container.replaceChildren(sizer);
         container.scrollTop = 0;
+      }
+
+      // The list can get shorter than where it is scrolled to -- a filter typed
+      // after scrolling down is the way to see it -- and a browser clamps
+      // `scrollTop` at its own pace, some time after this. Drawing from a
+      // position past the end draws nothing, so it is clamped before the draw
+      // reads it rather than a frame later.
+      const furthest = Math.max(0, rows.length * rowHeight - container.clientHeight);
+      if (container.scrollTop > furthest) {
+        container.scrollTop = furthest;
       }
 
       draw(true);
@@ -189,6 +210,14 @@ function mount(container: HTMLElement): Mounted {
     },
   };
 }
+
+/**
+ * How close to the bottom counts as the bottom.
+ *
+ * Rows, not pixels. Asking a page early enough that it arrives before the
+ * scroll reaches where it goes is the whole point of asking early.
+ */
+const nearEnd = 20;
 
 /** How far one level of nesting indents, and where its guide is drawn. */
 const indent = 14;
