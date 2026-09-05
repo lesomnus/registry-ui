@@ -1,4 +1,5 @@
 import "./style.css";
+import { isDigest } from "./cache";
 import { listRepositories } from "./catalog";
 import { loadConfig, usableLogo, type PageConfig } from "./config";
 import { cache } from "./manifest";
@@ -9,6 +10,7 @@ import { connect, connectionOf, type Connection, type RegistryClient } from "./r
 import { Search, type RepoSummary } from "./search";
 import { element } from "./render/dom";
 import { renderImage } from "./render/image";
+import { formatRoute, parseRoute, type Route } from "./route";
 
 const el = {
   form: document.getElementById("connection") as HTMLFormElement,
@@ -38,10 +40,24 @@ const el = {
 
 const state: {
   client?: RegistryClient;
+  /** The registry the client is for, which is also what goes in the address. */
+  domain?: string;
+  /** The deployment fixed the registry, so the address may not change it. */
+  locked: boolean;
   repositories: string[];
   repository?: string;
   tags: string[];
-  tag?: string;
+  /** What the image pane shows: a tag, or the digest of something below one. */
+  reference?: string;
+  /**
+   * The tag a digest was opened from, when it was.
+   *
+   * Carried in the history entry rather than derived from what is selected, so
+   * it is only there when the drill-down actually happened -- going back to a
+   * digest that was reached by its own link says nothing about a tag, because
+   * there was none.
+   */
+  via?: string;
   /** Bumped on every selection, so a slow answer for an old one is dropped. */
   generation: number;
   tree: boolean;
@@ -52,7 +68,16 @@ const state: {
   found: Map<string, RepoSummary>;
   /** The query those results are for, so a stale answer can be recognised. */
   foundFor: string;
-} = { repositories: [], tags: [], generation: 0, tree: false, expanded: new Set(), found: new Map(), foundFor: "" };
+} = {
+  locked: false,
+  repositories: [],
+  tags: [],
+  generation: 0,
+  tree: false,
+  expanded: new Set(),
+  found: new Map(),
+  foundFor: "",
+};
 
 /**
  * Where every occurrence of `needle` is in `haystack`, case-insensitively.
@@ -175,6 +200,9 @@ function applyLock(config: PageConfig): void {
  * The page is reloaded rather than the fields cleared, so what comes back is
  * the deployment's own answer -- including opening a configured registry by
  * itself, which is what a fresh visitor would see.
+ *
+ * The address goes with it. It names a registry too, and a reset that put you
+ * straight back on the one you were trying to leave would not be one.
  */
 function forget(): void {
   try {
@@ -183,7 +211,7 @@ function forget(): void {
     // A browser that refuses storage has nothing to forget.
   }
 
-  location.reload();
+  location.replace(`${location.pathname}${location.search}`);
 }
 
 function fillForm(config: PageConfig): void {
@@ -240,7 +268,7 @@ function renderRepositories(): void {
         matches: matchesIn(name, filter),
         note: known.has(name) ? undefined : "found",
         current: name === state.repository,
-        onSelect: () => void selectRepository(name),
+        onSelect: () => go({ repository: name }),
       })),
       empty,
     );
@@ -254,7 +282,7 @@ function renderRepositories(): void {
       state.expanded,
       (label) => labelMatches(label, filter),
       (repository) => repository === state.repository,
-      (repository) => void selectRepository(repository),
+      (repository) => go({ repository }),
       (path) => {
         // Toggling moves everything below it, and the thing that was clicked is
         // what the eye is on -- so it is held exactly where it is rather than
@@ -316,63 +344,67 @@ function toggleView(): void {
   }
 }
 
+/**
+ * Which tag the list marks: the one being shown, or the one a digest was opened
+ * from. Drilling into a platform should not lose your place in the tag list.
+ */
+function selectedTag(): string | undefined {
+  const { reference, via } = state;
+  return reference !== undefined && !isDigest(reference) ? reference : via;
+}
+
 function renderTags(): void {
   el.tagCount.textContent = `${state.tags.length}`;
+  const current = selectedTag();
   renderList(
     el.tagList,
     state.tags.map((tag) => ({
       key: tag,
       label: tag,
-      current: tag === state.tag,
-      onSelect: () => void selectTag(tag),
+      current: tag === current,
+      onSelect: () => go({ repository: state.repository, reference: tag }),
     })),
     "No tags.",
   );
 }
 
-async function selectTag(tag: string): Promise<void> {
-  if (!state.client || !state.repository) {
-    return;
+const message = (error: unknown): string => String((error as Error).message ?? error);
+
+/**
+ * What is on screen, said as the reference it is.
+ *
+ * A manifest opened from an index would otherwise be an unlabelled table of
+ * layers: the tag is no longer what is being shown, and the tag list has no way
+ * to say so. When the digest was opened from a tag, that tag is a link back to
+ * the index it came from.
+ */
+function trail(repository: string, reference: string): Node {
+  const line = element("div", "trail");
+  line.append(element("span", "trail-name", repository));
+
+  const { via } = state;
+  if (via !== undefined && via !== reference) {
+    const back = element("button", "linklike", `:${via}`);
+    back.title = `Back to ${repository}:${via}`;
+    back.addEventListener("click", () => go({ repository, reference: via }));
+    line.append(back, element("span", "trail-sep", "\u203a"));
   }
 
-  state.tag = tag;
-  const generation = ++state.generation;
-  renderTags();
-  el.detail.replaceChildren(element("p", "loading", "Reading manifest..."));
-
-  try {
-    const rendered = await renderImage(state.client, state.repository, tag);
-    if (generation !== state.generation) {
-      return;
-    }
-
-    el.detail.replaceChildren(rendered);
-  } catch (error) {
-    if (generation !== state.generation) {
-      return;
-    }
-
-    el.detail.replaceChildren(element("p", "error", String((error as Error).message ?? error)));
-  }
+  line.append(element("span", "trail-ref", `${isDigest(reference) ? "@" : ":"}${reference}`));
+  return line;
 }
 
-async function selectRepository(name: string): Promise<void> {
-  if (!state.client) {
+async function loadTags(repository: string, generation: number): Promise<void> {
+  const client = state.client;
+  if (client === undefined) {
     return;
   }
 
-  state.repository = name;
-  state.tags = [];
-  state.tag = undefined;
-  const generation = ++state.generation;
-
-  renderRepositories();
   el.tagList.replaceChildren(element("p", "loading", "Loading..."));
   el.tagCount.textContent = "";
-  el.detail.replaceChildren(element("p", "empty", "Pick a tag."));
 
   try {
-    const tags = await listTags(state.client, name);
+    const tags = await listTags(client, repository);
     if (generation !== state.generation) {
       return;
     }
@@ -384,17 +416,170 @@ async function selectRepository(name: string): Promise<void> {
       return;
     }
 
-    el.tagList.replaceChildren(element("p", "error", String((error as Error).message ?? error)));
+    el.tagList.replaceChildren(element("p", "error", message(error)));
   }
 }
 
-async function open(connection: Connection): Promise<void> {
+async function showDetail(generation: number): Promise<void> {
+  const { client, repository, reference } = state;
+  if (client === undefined || repository === undefined) {
+    return;
+  }
+
+  if (reference === undefined) {
+    el.detail.replaceChildren(element("p", "empty", "Pick a tag."));
+    return;
+  }
+
+  el.detail.replaceChildren(element("p", "loading", "Reading manifest..."));
+
+  try {
+    // A child of an index is opened by navigating to its digest, not by
+    // replacing part of this view: it is a manifest of its own, it deserves the
+    // whole pane, and it should have an address like everything else here.
+    const rendered = await renderImage(client, repository, reference, (digest) =>
+      go({ repository, reference: digest }, isDigest(reference) ? state.via : reference),
+    );
+    if (generation !== state.generation) {
+      return;
+    }
+
+    el.detail.replaceChildren(trail(repository, reference), rendered);
+  } catch (error) {
+    if (generation !== state.generation) {
+      return;
+    }
+
+    el.detail.replaceChildren(trail(repository, reference), element("p", "error", message(error)));
+  }
+}
+
+/**
+ * Goes somewhere, by saying where in the address bar.
+ *
+ * Nothing in this page changes what it is showing by hand: a click writes the
+ * address and `applyRoute` reads it. So the back button, a pasted link and a
+ * click are one path rather than three, and there is no way to be on a page the
+ * address does not name.
+ *
+ * `via` rides in the history entry rather than in the address, because it is
+ * not part of what is being shown -- it is how it was reached, and going back
+ * to it later should recover the same answer.
+ */
+function go(route: Route, via?: string): void {
+  const hash = formatRoute({ domain: state.domain, ...route });
+  if (hash === (location.hash || "#")) {
+    return;
+  }
+
+  history.pushState({ via }, "", hash);
+  void refresh();
+}
+
+/**
+ * Makes the page show what the address says, changing only what differs.
+ *
+ * Diffing rather than rebuilding is what makes this usable as the single entry
+ * point: opening a tag in the repository already open must not reload the tag
+ * list, and pressing back from a digest to its tag must not reload anything.
+ */
+async function applyRoute(): Promise<void> {
+  const route = parseRoute(location.hash);
+  const via = (history.state as { via?: string } | null)?.via;
+
+  // A link into another registry opens it. Not for a deployment that fixed one:
+  // the lock is presentation rather than enforcement, but an address that walks
+  // around it would make it presentation of nothing.
+  if (route.domain !== undefined && !state.locked && route.domain !== state.domain) {
+    el.domain.value = route.domain;
+    const connection = connectionFromForm();
+    if (connection === undefined || !(await open(connection))) {
+      return;
+    }
+  }
+
+  const generation = ++state.generation;
+
+  if (route.repository !== state.repository) {
+    state.repository = route.repository;
+    state.tags = [];
+    state.reference = undefined;
+    state.via = undefined;
+    renderRepositories();
+    el.detail.replaceChildren(element("p", "empty", "Pick a tag."));
+
+    if (route.repository === undefined) {
+      el.tagList.replaceChildren(element("p", "empty", "Pick a repository."));
+      el.tagCount.textContent = "";
+      return;
+    }
+
+    await loadTags(route.repository, generation);
+    if (generation !== state.generation) {
+      return;
+    }
+  }
+
+  if (route.reference === state.reference && via === state.via) {
+    return;
+  }
+
+  state.reference = route.reference;
+  state.via = via;
+  renderTags();
+  await showDetail(generation);
+}
+
+/**
+ * One at a time. A fragment typed into the address bar fires two events, and
+ * both of them mean the same thing; running them in order makes the second a
+ * comparison against the state the first arrived at, which is nothing to do.
+ */
+let pending: Promise<void> = Promise.resolve();
+
+function refresh(): Promise<void> {
+  pending = pending.catch(() => undefined).then(() => applyRoute());
+  return pending;
+}
+
+function connectionFromForm(): Connection | undefined {
+  const domain = el.domain.value
+    .trim()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/+$/, "");
+  if (!domain) {
+    return undefined;
+  }
+
+  return {
+    domain,
+    username: el.username.value.trim() || undefined,
+    password: el.password.value || undefined,
+    direct: el.direct.checked,
+    insecure: el.insecure.checked,
+    forwarder: el.forwarder.value.trim() || undefined,
+  };
+}
+
+/** Connects, then lets the address say what to open on the other side. */
+async function reconnect(connection: Connection, route: Route): Promise<void> {
+  if (!(await open(connection))) {
+    return;
+  }
+
+  history.replaceState({}, "", formatRoute({ ...route, domain: connection.domain }));
+  await refresh();
+}
+
+/** Connects. Answers whether the registry is one, which is all a caller needs. */
+async function open(connection: Connection): Promise<boolean> {
   el.status.textContent = `Connecting to ${connection.domain}...`;
   el.status.className = "status";
   state.repositories = [];
   state.repository = undefined;
   state.tags = [];
-  state.tag = undefined;
+  state.reference = undefined;
+  state.via = undefined;
   el.repositoryList.replaceChildren(element("p", "loading", "Loading..."));
   el.tagList.replaceChildren(element("p", "empty", "Pick a repository."));
   el.detail.replaceChildren(element("p", "empty", "Pick a tag."));
@@ -406,6 +591,7 @@ async function open(connection: Connection): Promise<void> {
   const [domain, init] = connectionOf(connection);
   const client = connect(connection);
   state.client = client;
+  state.domain = domain;
   state.search = new Search(domain, init);
   state.found = new Map();
   state.foundFor = "";
@@ -415,14 +601,29 @@ async function open(connection: Connection): Promise<void> {
     // not a registry, or you cannot reach it", rather than "it will not list".
     await client.ping().unwrap();
   } catch (error) {
-    el.status.textContent = `${connection.domain} did not answer as a registry: ${String((error as Error).message ?? error)}`;
+    el.status.textContent = `${connection.domain} did not answer as a registry: ${message(error)}`;
     el.status.className = "status error";
     el.repositoryList.replaceChildren();
-    return;
+    return false;
   }
 
   saveConnection(connection);
 
+  // Listed in the background rather than waited for. A link straight to an
+  // image should open the image; the catalog of a large registry takes seconds
+  // and fills the pane it belongs to while that happens.
+  void list(client, connection);
+  return true;
+}
+
+/**
+ * Fills the repository pane, outliving the call that started it.
+ *
+ * Nobody waits for this, so somebody may have connected elsewhere before it
+ * finishes: every write to the page is behind the same check that the client it
+ * was started for is still the one in use.
+ */
+async function list(client: RegistryClient, connection: Connection): Promise<void> {
   try {
     // Drawn as the pages arrive. The scroll position is held across each
     // redraw, so a list growing underneath somebody does not move what they are
@@ -441,12 +642,20 @@ async function open(connection: Connection): Promise<void> {
       }
     });
 
+    if (state.client !== client) {
+      return;
+    }
+
     el.status.textContent = `${connection.domain} — ${state.repositories.length} repositories`;
     renderRepositories();
   } catch (error) {
+    if (state.client !== client) {
+      return;
+    }
+
     // A registry that will not list is still one whose images can be opened,
     // if you know their names -- so this is a note rather than a failure.
-    el.status.textContent = `${connection.domain} — no repository list: ${String((error as Error).message ?? error)}`;
+    el.status.textContent = `${connection.domain} — no repository list: ${message(error)}`;
     el.status.className = "status warn";
     el.repositoryList.replaceChildren(element("p", "empty", "This registry does not list its repositories."));
   }
@@ -454,19 +663,17 @@ async function open(connection: Connection): Promise<void> {
 
 el.form.addEventListener("submit", (event) => {
   event.preventDefault();
-  const domain = el.domain.value.trim().replace(/^https?:\/\//, "").replace(/\/+$/, "");
-  if (!domain) {
+  const connection = connectionFromForm();
+  if (connection === undefined) {
     return;
   }
 
-  void open({
-    domain,
-    username: el.username.value.trim() || undefined,
-    password: el.password.value || undefined,
-    direct: el.direct.checked,
-    insecure: el.insecure.checked,
-    forwarder: el.forwarder.value.trim() || undefined,
-  });
+  // Reconnecting to the same registry -- a credential typed in, a checkbox
+  // changed -- keeps your place. A different registry has different
+  // repositories, so what the address names does not survive the change.
+  const route = parseRoute(location.hash);
+  const same = route.domain === undefined || route.domain === connection.domain;
+  void reconnect(connection, same ? route : {});
 });
 
 /**
@@ -525,17 +732,30 @@ el.filter.addEventListener("input", onFilterInput);
 el.view.addEventListener("click", toggleView);
 el.reset.addEventListener("click", forget);
 
-void loadConfig().then((config) => {
+window.addEventListener("popstate", () => void refresh());
+window.addEventListener("hashchange", () => void refresh());
+
+void loadConfig().then(async (config) => {
   applyBranding(config);
   fillForm(config);
 
   // After filling, so what it hides has already been given its value: a locked
   // deployment still connects with the domain the operator set.
   applyLock(config);
+  state.locked = config.locked === true;
+
+  // The address wins over both the deployment's default and what this browser
+  // remembers: it is the most recent thing anyone said about where to look, and
+  // a link that opened somewhere else would not be a link.
+  const route = parseRoute(location.hash);
+  if (route.domain !== undefined && !state.locked) {
+    el.domain.value = route.domain;
+  }
 
   // A deployment that names a registry means to be opened on it, rather than to
   // ask the person to press the button that was already filled in for them.
-  if (el.domain.value) {
-    el.form.requestSubmit();
+  const connection = connectionFromForm();
+  if (connection !== undefined) {
+    await reconnect(connection, route);
   }
 });

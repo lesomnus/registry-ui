@@ -124,9 +124,6 @@ header {
   color: var(--warn);
 }
 
-
-
-
 main {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(200px, 1fr) minmax(340px, 2fr);
@@ -291,9 +288,25 @@ input[type="search"]:focus {
   overflow-y: auto;
 }
 
+/* What the image pane is showing, written as a reference somebody could pull. */
+.trail {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  margin: 10px 0 14px;
+  font: 12px var(--mono);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
 
+.trail-sep {
+  margin: 0 8px;
+  color: var(--text-muted);
+}
 
-
+.trail-ref {
+  min-width: 0;
+}
 
 dl {
   display: grid;

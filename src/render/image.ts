@@ -1,3 +1,4 @@
+import { isDigest } from "../cache";
 import { indexMediaTypes } from "../media-types";
 import type { RegistryClient } from "../registry";
 import type { Descriptor } from "./artifact";
@@ -6,7 +7,11 @@ import type { Cell } from "./dom";
 import { readBlob, readManifest } from "../manifest";
 import { definitions, element, formatSize, shortDigest, table } from "./dom";
 
-type Child = { digest: string; mediaType?: string; platform?: { os?: string; architecture?: string; variant?: string } };
+type Child = {
+  digest: string;
+  mediaType?: string;
+  platform?: { os?: string; architecture?: string; variant?: string };
+};
 type Manifest = {
   manifests?: Child[];
   layers?: { digest: string; size?: number; mediaType?: string }[];
@@ -52,12 +57,18 @@ async function referrersOf(client: RegistryClient, repository: string, digest: s
  *
  * An image with nothing attached says so, rather than saying nothing: the
  * absence of a badge and the absence of a signature should not look the same.
+ *
+ * "Unsigned" is a verdict on something somebody asked for by name, so it is
+ * only said of a tag. A manifest opened by digest -- a platform inside an index
+ * -- gets the weaker and truer "nothing attached": cosign signs the index, and
+ * calling each platform below a signed image unsigned would be the wrong
+ * headline for a true fact.
  */
-function signedBadge(attachments: Attachment[]): Node {
+function signedBadge(attachments: Attachment[], byDigest: boolean): Node {
   const fragment = document.createDocumentFragment();
   const signatures = attachments.filter(({ descriptor }) => isSignature(descriptor));
   if (signatures.length === 0) {
-    fragment.append(element("span", "badge-unsigned", "unsigned"));
+    fragment.append(element("span", "badge-unsigned", byDigest ? "nothing attached" : "unsigned"));
     return fragment;
   }
 
@@ -70,7 +81,12 @@ function signedBadge(attachments: Attachment[]): Node {
   return fragment;
 }
 
-function attachedSection(client: RegistryClient, repository: string, attachments: Attachment[], showSubject: boolean): Node {
+function attachedSection(
+  client: RegistryClient,
+  repository: string,
+  attachments: Attachment[],
+  showSubject: boolean,
+): Node {
   const fragment = document.createDocumentFragment();
   fragment.append(element("h3", undefined, "Attached"));
 
@@ -103,8 +119,20 @@ function attachedSection(client: RegistryClient, repository: string, attachments
   return fragment;
 }
 
-/** Everything this page has to say about one tag. */
-export async function renderImage(client: RegistryClient, repository: string, reference: string): Promise<Node> {
+/**
+ * Everything this page has to say about one reference.
+ *
+ * The reference is a tag or a digest, and nothing below cares which: an index
+ * opened by tag and a manifest opened by the digest the index named are the
+ * same read. That is what makes a child of an index openable -- `open` is
+ * called with the child's digest and the caller comes back here with it.
+ */
+export async function renderImage(
+  client: RegistryClient,
+  repository: string,
+  reference: string,
+  open: (digest: string) => void,
+): Promise<Node> {
   // `unwrap()` has already read the body, and the result *is* the manifest with
   // `raw` and `as()` laid over it. Asking `raw.json()` again throws.
   // Read for its bytes, so the digest is computed rather than taken on trust --
@@ -160,12 +188,22 @@ export async function renderImage(client: RegistryClient, repository: string, re
     fragment.append(
       table(
         [{ text: "Platform" }, { text: "Digest" }, { text: "Layers", numeric: true }, { text: "Size", numeric: true }],
-        resolved.map(({ child, size, layers }) => [
-          { text: isAttestation(child) ? "attestation" : platformName(child.platform) },
-          { text: shortDigest(child.digest) },
-          { text: layers === undefined ? "-" : String(layers), numeric: true },
-          { text: size === undefined ? "-" : formatSize(size), numeric: true },
-        ]),
+        resolved.map(({ child, size, layers }) => {
+          // The platform is the handle, the way the type is in Attached: what
+          // is behind it is a manifest of its own, with its own layers and its
+          // own config, and this table has room for neither.
+          const label = isAttestation(child) ? "attestation" : platformName(child.platform);
+          const handle = element("button", "linklike", label);
+          handle.title = `Open ${label}`;
+          handle.addEventListener("click", () => open(child.digest));
+
+          return [
+            { text: label, node: handle },
+            { text: shortDigest(child.digest) },
+            { text: layers === undefined ? "-" : String(layers), numeric: true },
+            { text: size === undefined ? "-" : formatSize(size), numeric: true },
+          ];
+        }),
       ),
     );
 
@@ -187,7 +225,7 @@ export async function renderImage(client: RegistryClient, repository: string, re
       )
     ).flat();
 
-    badge.replaceChildren(signedBadge(attachments));
+    badge.replaceChildren(signedBadge(attachments, isDigest(reference)));
     fragment.append(attachedSection(client, repository, attachments, true));
     return fragment;
   }
@@ -243,7 +281,7 @@ export async function renderImage(client: RegistryClient, repository: string, re
           subjectLabel: "image",
         }));
 
-  badge.replaceChildren(signedBadge(attachments));
+  badge.replaceChildren(signedBadge(attachments, isDigest(reference)));
   fragment.append(attachedSection(client, repository, attachments, false));
   return fragment;
 }

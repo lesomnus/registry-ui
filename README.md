@@ -28,7 +28,9 @@ the last column: an image is a thing you are about to run, and whether it is
 signed — and by whom — is the first question, not a detail.
 
 So a tag opens onto its digest, its platforms, its layers, and a table of
-everything attached to it. **The type picks the renderer.** A sigstore signature
+everything attached to it. A platform in that table opens too: what is behind it
+is a manifest of its own, with its own config, labels and layers, and it gets
+the whole pane rather than a row. **The type picks the renderer.** A sigstore signature
 is keyless, so its identity is not a key somebody holds but the workflow that
 asked for the certificate, and that is what you see:
 
@@ -55,6 +57,31 @@ the chain, not the dates, not the signature. It reports what a signature claims
 about itself, and `cosign verify` or `notation verify` is what decides whether
 to believe it.
 
+## The address is a reference
+
+```
+https://lesomnus.github.io/registry-ui/#cr.example/app/kamiadm:260830
+https://lesomnus.github.io/registry-ui/#cr.example/app/kamiadm@sha256:7b0a4abf138d...
+```
+
+The fragment is not a route language: it is `domain/repository:tag` or
+`domain/repository@sha256:...`, the same string you would hand to `docker pull`.
+So a link to what is on screen reads as the thing it is showing, the part after
+the `#` pastes straight into a pull, and the back button works — including back
+out of a platform into the index it came from.
+
+Where it differs from `docker pull`, both times because there is no daemon here
+to make something up: no domain means the registry the page is already connected
+to rather than Docker Hub, and no tag means the repository with nothing opened
+rather than `latest`. A deployment that [fixed its registry](#a-ui-for-one-registry)
+ignores the domain in a link — the lock is presentation rather than enforcement,
+but an address that walked around it would be presentation of nothing.
+
+It is a fragment rather than a path because this is built to be served by
+anything that serves files. A path route needs the server to answer every path
+with `index.html`; a fragment never reaches the server, so the same build works
+on GitHub Pages, under any base path, out of a bucket.
+
 ## Containers
 
 Two images, because they are two different things.
@@ -78,24 +105,24 @@ startup from its environment and the page fetches it on load:
 docker run -p 8080:8080 -e REGISTRY_DOMAIN=registry.example registry-ui
 ```
 
-| Variable             |                                                         |
-| -------------------- | ------------------------------------------------------- |
-| `REGISTRY_DOMAIN`    | e.g. `registry.example`, `localhost:5000`               |
-| `REGISTRY_FORWARDER` | where the forwarder is, if it is not this origin        |
-| `REGISTRY_INSECURE`  | `true` for a registry with no TLS                       |
-| `REGISTRY_DIRECT`    | `true` for a registry that sends CORS headers           |
+| Variable             |                                                  |
+| -------------------- | ------------------------------------------------ |
+| `REGISTRY_DOMAIN`    | e.g. `registry.example`, `localhost:5000`        |
+| `REGISTRY_FORWARDER` | where the forwarder is, if it is not this origin |
+| `REGISTRY_INSECURE`  | `true` for a registry with no TLS                |
+| `REGISTRY_DIRECT`    | `true` for a registry that sends CORS headers    |
 
 Set a domain and the page opens it by itself rather than asking somebody to
 press a button that was already filled in for them.
 
 ### A UI for one registry
 
-| Variable             |                                                                |
-| -------------------- | -------------------------------------------------------------- |
+| Variable             |                                                                    |
+| -------------------- | ------------------------------------------------------------------ |
 | `REGISTRY_LOCKED`    | `true` to fix the connection: no box to type another registry into |
-| `REGISTRY_ANONYMOUS` | `true` to drop the credential fields as well                   |
-| `REGISTRY_LOGO`      | an image for the corner: a URL, a `data:` URI, or a path       |
-| `REGISTRY_TITLE`     | what to call it, beside the logo and in the browser tab        |
+| `REGISTRY_ANONYMOUS` | `true` to drop the credential fields as well                       |
+| `REGISTRY_LOGO`      | an image for the corner: a URL, a `data:` URI, or a path           |
+| `REGISTRY_TITLE`     | what to call it, beside the logo and in the browser tab            |
 
 Locking hides the registry, forwarder and transport controls and states the
 registry instead. Credentials stay — which registry to read is a decision the
@@ -125,7 +152,7 @@ shipped with, which is exactly what they look like.
 environment is a credential in `docker inspect`, in the orchestrator's API and
 in anything that reads either. The page asks for one.
 
-Against a registry that *does* send them — zot, or anything behind an ingress
+Against a registry that _does_ send them — zot, or anything behind an ingress
 that adds them — run the page alone and tick **direct**. There is then nothing
 else to deploy and nothing that can be asked to fetch a URL.
 
@@ -189,15 +216,15 @@ reach. What keeps it from being useful for server-side request forgery:
 - private, loopback and link-local addresses are refused
 - responses over `MAX_BODY_BYTES` (8 MiB) are refused before the body is read
 
-The refusal is by literal address, so a hostname that *resolves* to a private
+The refusal is by literal address, so a hostname that _resolves_ to a private
 address is not caught. **Do not put this on the public internet.**
 
-| Variable                |                                                                 |
-| ----------------------- | --------------------------------------------------------------- |
-| `PORT`                  | Default `8080`.                                                 |
-| `ALLOW_PRIVATE_TARGETS` | `true` to reach a registry on your own network or machine.      |
-| `MAX_BODY_BYTES`        | Default 8 MiB.                                                  |
-| `ALLOWED_ORIGIN`        | Who may call it from a browser. Default `*`.                    |
+| Variable                |                                                            |
+| ----------------------- | ---------------------------------------------------------- |
+| `PORT`                  | Default `8080`.                                            |
+| `ALLOW_PRIVATE_TARGETS` | `true` to reach a registry on your own network or machine. |
+| `MAX_BODY_BYTES`        | Default 8 MiB.                                             |
+| `ALLOWED_ORIGIN`        | Who may call it from a browser. Default `*`.               |
 
 `*` is not the hole it looks like: the forwarder holds no credentials, so
 allowing any page to call it grants that page nothing it could not get by making
@@ -237,13 +264,14 @@ handled rather than reported:
 
 - **The digest is computed**, not read. It is the SHA-256 of the manifest bytes
   and the bytes are right here, so trusting a header was never necessary. When
-  the header *is* readable it is checked, and a registry naming a digest its own
+  the header _is_ readable it is checked, and a registry naming a digest its own
   bytes do not have is said out loud.
 
   Computing needs `crypto.subtle`, which browsers give only to a **secure
   context** — https, or localhost. Served over plain http from anywhere else,
   the page falls back to the reported digest and says it is unverified, or says
   there is none. It is one line of the answer, not the answer.
+
 - **Paging falls back to the last name returned** when `Link` cannot be read,
   which is what the spec says to send back anyway. A page that adds nothing new
   ends the walk, so a registry whose cursor is not a name stops rather than
@@ -326,7 +354,7 @@ Through [`@lesomnus/oci-client`](https://github.com/lesomnus/oci-client), which
 implements the distribution API for the browser.
 
 The useful seam is `Transport`. Token authentication sends a client to a
-*second* host — the `realm` in the `WWW-Authenticate` challenge — and
+_second_ host — the `realm` in the `WWW-Authenticate` challenge — and
 oci-client asks for that token through the same transport chain. So one
 transport underneath its authorizer catches the registry and the token endpoint
 both, and neither of them knows it is being forwarded. A URL prefix applied
@@ -346,8 +374,8 @@ tag schema. This page does not know which kind it is talking to.
 suggests and the right thing here. Naming the four types a page can read is 196
 bytes, a request header over **128** is not CORS-safelisted, and a page is then
 preflighting every manifest — which the registry has to allow `accept` on. zot
-does not, so browsing one directly failed on every manifest with *"Request
-header field accept is not allowed by Access-Control-Allow-Headers"*.
+does not, so browsing one directly failed on every manifest with _"Request
+header field accept is not allowed by Access-Control-Allow-Headers"_.
 
 It bought nothing anyway. Measured against Docker Hub and zot, over a modern
 index, a Docker manifest list and a schema1 image: every registry answered with
@@ -386,6 +414,7 @@ workaround is gone.
 src/transport.ts     the forwarder as a Transport, and the direct one
 src/registry.ts      the client, and the credentials middleware
 src/catalog.ts       the repository list, followed to the end
+src/route.ts         the address bar, parsed as an image reference
 src/certificate.ts   the Fulcio extensions, read out of DER
 src/render/          dom helpers, the image view, the artifact renderers
 server/main.ts       the page, and the forwarder
