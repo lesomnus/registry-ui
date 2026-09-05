@@ -15,7 +15,52 @@ export type PageConfig = {
   forwarder?: string;
   insecure?: boolean;
   direct?: boolean;
+
+  /**
+   * Fix the connection: no box to type a different registry into.
+   *
+   * For a deployment that exists to browse one registry. **It is presentation,
+   * not enforcement** -- the page runs in a browser, and anybody who opens the
+   * console can ask any registry anything their network and their credentials
+   * allow. What it stops is a person wondering what the box is for, not a
+   * person who means to use it.
+   */
+  locked?: boolean;
+
+  /** Hide the credential fields, for a registry that wants none. */
+  anonymous?: boolean;
+
+  /** An image for the corner: a URL, a path, or a `data:` URI. */
+  logo?: string;
+
+  /** What to call this deployment, beside the logo and in the tab. */
+  title?: string;
 };
+
+/**
+ * Whether a logo is something to put in `src`.
+ *
+ * `javascript:` in an `img` src does nothing in any browser still shipping, but
+ * the value comes from a deployment's environment and lands in the DOM, and the
+ * cost of naming the three things it may be is nothing.
+ */
+export function usableLogo(logo: string | undefined): string | undefined {
+  if (logo === undefined || logo === "") {
+    return undefined;
+  }
+
+  if (/^https?:\/\//i.test(logo) || /^data:image\//i.test(logo)) {
+    return logo;
+  }
+
+  // A path to something served alongside the page.
+  if (/^[./]/.test(logo) && !logo.includes(":")) {
+    return logo;
+  }
+
+  console.warn(`logo is not a URL this will load: ${logo}`);
+  return undefined;
+}
 
 /**
  * Reads `/config.json`, and treats every way of not finding one as "none".

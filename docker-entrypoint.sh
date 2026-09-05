@@ -37,6 +37,10 @@ add_bool() {
 
 add_string domain "${REGISTRY_DOMAIN:-}"
 add_string forwarder "${REGISTRY_FORWARDER:-}"
+add_string logo "${REGISTRY_LOGO:-}"
+add_string title "${REGISTRY_TITLE:-}"
+add_bool locked "${REGISTRY_LOCKED:-}"
+add_bool anonymous "${REGISTRY_ANONYMOUS:-}"
 add_bool insecure "${REGISTRY_INSECURE:-}"
 add_bool direct "${REGISTRY_DIRECT:-}"
 

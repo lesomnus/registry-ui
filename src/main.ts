@@ -1,6 +1,6 @@
 import "./style.css";
 import { listRepositories } from "./catalog";
-import { loadConfig, type PageConfig } from "./config";
+import { loadConfig, usableLogo, type PageConfig } from "./config";
 import { cache } from "./manifest";
 import { listAnchor, renderList, scrollListTo } from "./render/list";
 import { ancestorsOf, buildTree, flattenTree } from "./render/tree";
@@ -18,6 +18,13 @@ const el = {
   direct: document.getElementById("direct") as HTMLInputElement,
   insecure: document.getElementById("insecure") as HTMLInputElement,
   forwarder: document.getElementById("forwarder") as HTMLInputElement,
+  open: document.getElementById("open") as HTMLButtonElement,
+  fixed: document.getElementById("fixed") as HTMLElement,
+  insecureLabel: document.getElementById("insecure-label") as HTMLElement,
+  directLabel: document.getElementById("direct-label") as HTMLElement,
+  brand: document.getElementById("brand") as HTMLElement,
+  logo: document.getElementById("logo") as HTMLImageElement,
+  title: document.getElementById("title") as HTMLElement,
   status: document.getElementById("status") as HTMLElement,
   repositoryList: document.getElementById("repository-list") as HTMLElement,
   repositoryCount: document.getElementById("repository-count") as HTMLElement,
@@ -98,6 +105,63 @@ function saveConnection(connection: Connection): void {
  * already typed a registry into this browser, which is worth knowing before
  * wondering why.
  */
+/**
+ * Puts the deployment's name and mark in the corner, if it has them.
+ *
+ * The tab takes the name too: several of these open at once, against several
+ * registries, is the case this exists for.
+ */
+function applyBranding(config: PageConfig): void {
+  const logo = usableLogo(config.logo);
+  const title = config.title?.trim();
+
+  if (logo !== undefined) {
+    el.logo.src = logo;
+    el.logo.alt = title ?? "";
+    el.logo.hidden = false;
+  }
+
+  if (title) {
+    el.title.textContent = title;
+    document.title = title;
+  }
+
+  el.brand.hidden = logo === undefined && !title;
+}
+
+/**
+ * Fixes the connection, for a deployment that exists to browse one registry.
+ *
+ * The boxes go away and the registry is stated instead. Credentials stay --
+ * which registry to read is a decision the deployment made, and who is reading
+ * is not -- unless it is also marked anonymous, in which case there is nothing
+ * left to fill in and the form goes entirely.
+ *
+ * Worth being plain about: this is presentation. The page runs in a browser and
+ * anybody who opens the console can ask any registry anything their network and
+ * their credentials already allow. It stops somebody wondering what the box is
+ * for, not somebody who means to use it.
+ */
+function applyLock(config: PageConfig): void {
+  el.fixed.hidden = true;
+  if (config.locked !== true) {
+    return;
+  }
+
+  for (const node of [el.domain, el.forwarder, el.insecureLabel, el.directLabel]) {
+    node.hidden = true;
+  }
+
+  el.fixed.textContent = config.domain ?? "";
+  el.fixed.hidden = false;
+
+  if (config.anonymous === true) {
+    el.username.hidden = true;
+    el.password.hidden = true;
+    el.open.hidden = true;
+  }
+}
+
 function fillForm(config: PageConfig): void {
   let saved: Partial<Connection> = {};
   try {
@@ -106,15 +170,22 @@ function fillForm(config: PageConfig): void {
     // Nothing remembered, which is the same as nothing to restore.
   }
 
-  el.domain.value = saved.domain ?? config.domain ?? "";
+  // A locked deployment ignores what was remembered for the parts it fixes:
+  // somebody who browsed elsewhere before it was locked would otherwise keep
+  // going there, from a page that no longer offers a way back.
+  const fixed = config.locked === true;
+
+  el.domain.value = (fixed ? config.domain : (saved.domain ?? config.domain)) ?? "";
   el.username.value = saved.username ?? "";
-  el.forwarder.value = saved.forwarder ?? config.forwarder ?? "";
-  // On unless told otherwise. A page served from a plain file server -- GitHub
-  // Pages, an S3 bucket -- has no forwarder to reach, so talking to the registry
-  // directly is the only thing that can work there. A deployment that does have
-  // one says so: the bundled server answers /config.json with `direct: false`.
-  el.direct.checked = saved.direct ?? config.direct ?? true;
-  el.insecure.checked = saved.insecure ?? config.insecure ?? false;
+  el.forwarder.value = (fixed ? config.forwarder : (saved.forwarder ?? config.forwarder)) ?? "";
+
+  // direct is on unless told otherwise. A page served from a plain file server
+  // -- GitHub Pages, an S3 bucket -- has no forwarder to reach, so talking to
+  // the registry directly is the only thing that can work there. A deployment
+  // that does have one says so: the bundled server answers /config.json with
+  // `direct: false`.
+  el.direct.checked = (fixed ? config.direct : (saved.direct ?? config.direct)) ?? true;
+  el.insecure.checked = (fixed ? config.insecure : (saved.insecure ?? config.insecure)) ?? false;
 }
 
 function renderRepositories(): void {
@@ -430,7 +501,12 @@ el.filter.addEventListener("input", onFilterInput);
 el.view.addEventListener("click", toggleView);
 
 void loadConfig().then((config) => {
+  applyBranding(config);
   fillForm(config);
+
+  // After filling, so what it hides has already been given its value: a locked
+  // deployment still connects with the domain the operator set.
+  applyLock(config);
 
   // A deployment that names a registry means to be opened on it, rather than to
   // ask the person to press the button that was already filled in for them.

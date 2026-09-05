@@ -46,4 +46,12 @@ EXPOSE 8080
 #   REGISTRY_FORWARDER  where the forwarder is, if it is not this origin
 #   REGISTRY_INSECURE   "true" for a registry with no TLS
 #   REGISTRY_DIRECT     "true" for a registry that sends CORS headers
+#   REGISTRY_LOCKED     "true" to fix the connection: no box to type another
+#                       registry into. Presentation, not enforcement -- see the
+#                       README.
+#   REGISTRY_ANONYMOUS  "true" to drop the credential fields as well
+#   REGISTRY_LOGO       an image for the corner: a URL, a `data:` URI, or a path
+#                       to something mounted alongside the page
+#   REGISTRY_TITLE      what to call this deployment, beside the logo and in the
+#                       browser tab
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

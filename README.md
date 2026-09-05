@@ -88,6 +88,30 @@ docker run -p 8080:8080 -e REGISTRY_DOMAIN=registry.example registry-ui
 Set a domain and the page opens it by itself rather than asking somebody to
 press a button that was already filled in for them.
 
+### A UI for one registry
+
+| Variable             |                                                                |
+| -------------------- | -------------------------------------------------------------- |
+| `REGISTRY_LOCKED`    | `true` to fix the connection: no box to type another registry into |
+| `REGISTRY_ANONYMOUS` | `true` to drop the credential fields as well                   |
+| `REGISTRY_LOGO`      | an image for the corner: a URL, a `data:` URI, or a path       |
+| `REGISTRY_TITLE`     | what to call it, beside the logo and in the browser tab        |
+
+Locking hides the registry, forwarder and transport controls and states the
+registry instead. Credentials stay — which registry to read is a decision the
+deployment made, who is reading is not — unless `REGISTRY_ANONYMOUS` says there
+is nothing to fill in.
+
+A locked deployment also ignores what this browser remembers for the parts it
+fixes. Somebody who browsed elsewhere before it was locked would otherwise keep
+going there, from a page with no way back.
+
+> **It is presentation, not enforcement.** The page runs in a browser, and
+> anybody who opens the console can ask any registry anything their network and
+> their credentials already allow. It stops somebody wondering what the box is
+> for. It does not stop somebody who means to use it, and nothing served to a
+> browser could.
+
 These are **defaults**. Someone who types a different registry has that
 remembered in their browser, which also means changing the variable does not
 move somebody who has already typed one — they clear the field or their site
