@@ -342,10 +342,17 @@ somewhere else.
 A registry with no referrers API is handled inside the client, by the referrers
 tag schema. This page does not know which kind it is talking to.
 
-Manifest requests say what they can read — OCI and Docker, index and manifest.
-Without that a registry answers with whatever it prefers, or with a `404` for a
-manifest it cannot put in a form the caller claimed to understand, which looks
-like a missing tag rather than a refused one.
+**Manifest requests send no `Accept`**, which is the opposite of what the spec
+suggests and the right thing here. Naming the four types a page can read is 196
+bytes, a request header over **128** is not CORS-safelisted, and a page is then
+preflighting every manifest — which the registry has to allow `accept` on. zot
+does not, so browsing one directly failed on every manifest with *"Request
+header field accept is not allowed by Access-Control-Allow-Headers"*.
+
+It bought nothing anyway. Measured against Docker Hub and zot, over a modern
+index, a Docker manifest list and a schema1 image: every registry answered with
+the same media type whether it was sent the full list, the two OCI types, `*/*`,
+or nothing. A registry returns what it has.
 
 Tick **http** for a registry with no TLS, which is most of them on your own
 machine. The scheme is rewritten on the way out, so nothing above has to know.

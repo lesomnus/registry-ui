@@ -1,6 +1,5 @@
-import { Accept, ClientV2, TransportAuthorizer, Unsecure, ext } from "@lesomnus/oci-client";
+import { ClientV2, TransportAuthorizer, Unsecure, ext } from "@lesomnus/oci-client";
 import type { ClientInit, Transport, TransportMiddleware } from "@lesomnus/oci-client";
-import { manifestMediaTypes } from "./media-types";
 import { DirectTransport, ProxyTransport } from "./transport";
 
 /** ClientV2, plus `_catalog`, which is not in the distribution spec. */
@@ -51,18 +50,14 @@ export function connectionOf(connection: Connection): [string, ClientInit] {
       ? { username: connection.username, password: connection.password }
       : undefined;
 
-  // Accept goes first so it is on the request the authorizer retries as well:
-  // a manifest request that does not say what it can read is answered with
-  // whatever the registry prefers, or with a 404 for a manifest it cannot put
-  // in a form the caller claimed to understand.
+  // No `Accept`, on purpose. See src/media-types.ts.
   //
   // Unsecure is last, on the way out, so everything above it goes on building
   // https URLs and does not have to know.
-  const accept = new Accept({ manifests: manifestMediaTypes });
   const authorizer = new TransportAuthorizer({ credential });
   const transport: [TransportMiddleware, ...TransportMiddleware[], Transport] = connection.insecure
-    ? [accept, authorizer, new Unsecure(), wire]
-    : [accept, authorizer, wire];
+    ? [authorizer, new Unsecure(), wire]
+    : [authorizer, wire];
 
   return [connection.domain, { transport }];
 }
