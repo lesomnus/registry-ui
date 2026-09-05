@@ -197,7 +197,7 @@ const server = Bun.serve({
     // forwarder, so it turns off the direct default -- a page served from a
     // plain file server has no forwarder to reach and leaves it on.
     if (url.pathname === "/config.json") {
-      return Response.json({ direct: false });
+      return Response.json({ direct: false, forwarder: "/-/fetch" });
     }
 
     if (url.pathname === "/-/health") {

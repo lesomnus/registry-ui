@@ -25,14 +25,30 @@ export class ProxyTransport implements Transport {
    * @param endpoint where the forwarder is. A path when it is served from this
    * origin, which is what the bundled server does; a full URL when the page is
    * a static build somewhere else and the forwarder is its own deployment.
+   *
+   * The default is this origin, which is right where the page and the forwarder
+   * ship together and wrong on a static host -- so a request that lands on
+   * nothing says which of the two it is.
    */
   constructor(endpoint = "/-/fetch") {
     this.endpoint = endpoint.replace(/\/+$/, "") || "/-/fetch";
   }
 
-  fetch(resource: RequestInfo | URL, init?: ReqInit): Promise<Response> {
+  async fetch(resource: RequestInfo | URL, init?: ReqInit): Promise<Response> {
     const target = resource instanceof Request ? resource.url : resource.toString();
-    return fetch(`${this.endpoint}?url=${encodeURIComponent(target)}`, init);
+    const res = await fetch(`${this.endpoint}?url=${encodeURIComponent(target)}`, init);
+
+    // A forwarder answers JSON, including when it refuses. Anything else at a
+    // 404 is not a forwarder failing -- it is nothing being there, which is
+    // what a static host answers for a path it has never heard of. Saying so
+    // beats handing a page of HTML to a JSON parser.
+    if (res.status === 404 && !(res.headers.get("content-type") ?? "").includes("json")) {
+      throw new Error(
+        `no forwarder at ${this.endpoint} — tick "direct" to talk to the registry from the page, or give the address of one`,
+      );
+    }
+
+    return res;
   }
 }
 

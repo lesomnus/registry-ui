@@ -140,12 +140,14 @@ the root of a host, in a subdirectory, or on a Pages project site at
 Two things do not come with it:
 
 - **No forwarder.** Pages serves files and runs nothing. So either the registry
-  sends CORS headers and you tick **direct**, or you point the page at a
-  forwarder you run somewhere.
+  sends CORS headers and you tick **direct** — it is on by default — or you put
+  the address of a forwarder you run somewhere into the box. Untick direct with
+  that box empty and the page says there is no forwarder rather than sending
+  requests at a host that has never heard of one.
 - **No `config.json` from the environment**, since there is no container to
-  write one. Commit one next to `index.html` if the deployment should start
-  somewhere; without one the form opens empty, which is the right default for a
-  page anybody can load.
+  write one. So the published page has **no default registry** — the form opens
+  empty and waits. Commit a `config.json` next to `index.html` to change that;
+  the fields are the ones the container's variables set.
 
 And one thing to know: **Pages is HTTPS, so whatever the page talks to must be
 too.** A browser refuses an `http://` registry or forwarder from an `https://`
