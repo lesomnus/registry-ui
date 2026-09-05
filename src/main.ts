@@ -19,6 +19,7 @@ const el = {
   insecure: document.getElementById("insecure") as HTMLInputElement,
   forwarder: document.getElementById("forwarder") as HTMLInputElement,
   open: document.getElementById("open") as HTMLButtonElement,
+  reset: document.getElementById("reset") as HTMLButtonElement,
   fixed: document.getElementById("fixed") as HTMLElement,
   insecureLabel: document.getElementById("insecure-label") as HTMLElement,
   directLabel: document.getElementById("direct-label") as HTMLElement,
@@ -159,7 +160,30 @@ function applyLock(config: PageConfig): void {
     el.username.hidden = true;
     el.password.hidden = true;
     el.open.hidden = true;
+    el.reset.hidden = true;
   }
+}
+
+/**
+ * Forgets what this browser remembers, and starts again from the deployment.
+ *
+ * The remembered values are a convenience that outlives its usefulness: a
+ * registry typed once looks exactly like a default the page came with, and
+ * there was no way to tell the two apart or to get rid of the first. There is
+ * now, and it is the same button either way.
+ *
+ * The page is reloaded rather than the fields cleared, so what comes back is
+ * the deployment's own answer -- including opening a configured registry by
+ * itself, which is what a fresh visitor would see.
+ */
+function forget(): void {
+  try {
+    localStorage.removeItem(remembered);
+  } catch {
+    // A browser that refuses storage has nothing to forget.
+  }
+
+  location.reload();
 }
 
 function fillForm(config: PageConfig): void {
@@ -499,6 +523,7 @@ function onFilterInput(): void {
 
 el.filter.addEventListener("input", onFilterInput);
 el.view.addEventListener("click", toggleView);
+el.reset.addEventListener("click", forget);
 
 void loadConfig().then((config) => {
   applyBranding(config);

@@ -114,8 +114,12 @@ going there, from a page with no way back.
 
 These are **defaults**. Someone who types a different registry has that
 remembered in their browser, which also means changing the variable does not
-move somebody who has already typed one — they clear the field or their site
-data. That is the trade for the field being editable at all.
+move somebody who has already typed one. **reset** in the form forgets what the
+browser remembers and reloads, so the deployment's own answer comes back —
+including opening a configured registry by itself.
+
+Without it there was no way to tell a remembered value from a default the page
+shipped with, which is exactly what they look like.
 
 **There is no variable for a password.** A credential in a container's
 environment is a credential in `docker inspect`, in the orchestrator's API and
@@ -149,10 +153,22 @@ Two things do not come with it:
   empty and waits. Commit a `config.json` next to `index.html` to change that;
   the fields are the ones the container's variables set.
 
-And one thing to know: **Pages is HTTPS, so whatever the page talks to must be
-too.** A browser refuses an `http://` registry or forwarder from an `https://`
-page as mixed content, which rules out the **http** tick and a registry on your
-own machine.
+Two things to know about a page served from the public internet.
+
+**It is HTTPS, so whatever it talks to must be too.** A browser refuses an
+`http://` registry or forwarder from an `https://` page as mixed content, which
+rules out the **http** tick.
+
+**It cannot reach a registry on a private address.** Chrome's Private Network
+Access blocks a request from a public page to a private IP — 10.x, 192.168.x,
+localhost — and reports it as a CORS error, whatever CORS headers the registry
+sends. The target has to answer the preflight with
+`Access-Control-Allow-Private-Network: true`, and registries do not.
+
+So a page on GitHub Pages cannot browse an internal registry, and neither can a
+forwarder it reaches, because the forwarder would be on a private address too.
+**Run the container inside the network instead** — private to private is not
+blocked, and that is what the locked and branded image in `Dockerfile` is for.
 
 ## Why there is a server
 
