@@ -33,6 +33,8 @@ import type { RegistryClient } from "./registry";
 
 export type ReadManifest = {
   manifest: unknown;
+  /** The bytes as they arrived, which is what the digest is over. */
+  body: string;
   /** Absent when it could be neither computed nor read. See `digestOf`. */
   digest?: string;
   mediaType: string;
@@ -86,6 +88,7 @@ async function fetchManifest(client: RegistryClient, repository: string, referen
 
   return {
     manifest: JSON.parse(body) as unknown,
+    body,
     digest,
     mediaType: res.headers.get("Content-Type") ?? "-",
     mismatch,
@@ -136,6 +139,64 @@ export async function readBlob(client: RegistryClient, repository: string, diges
     return await res.raw.json();
   });
 }
+
+/**
+ * How much of a blob this page will hold in order to show it.
+ *
+ * A layer is allowed to be a gigabyte. Reading one into a string to put in a
+ * `<pre>` is a way to lose the tab, so above this the blob is offered as a
+ * download and not as a view. It also bounds what the cache below can hold:
+ * a text blob is remembered by digest like everything else, and 500 entries
+ * of this is a number that fits in a browser.
+ */
+export const viewableBytes = 1024 * 1024;
+
+/**
+ * A blob as text, for showing.
+ *
+ * Refuses before reading rather than after: `Content-Length` is asked first, so
+ * a layer too big to show costs a `HEAD`-shaped answer and not a download. A
+ * registry that declares no length is read anyway and cut off at the limit --
+ * a truncated view says so, which beats refusing something that would have fit.
+ */
+export async function readBlobText(
+  client: RegistryClient,
+  repository: string,
+  digest: string,
+): Promise<{ text: string; truncated: boolean }> {
+  return await cache.get(`${client.domain}/${repository}/text@${digest}`, async () => {
+    const res = await client.repo(repository).blobs.get(digest);
+    res.unwrap();
+
+    const declared = Number(res.raw.headers.get("content-length") ?? "");
+    if (Number.isFinite(declared) && declared > viewableBytes) {
+      throw new Error(`${formatBytes(declared)} is more than this page will read to show it`);
+    }
+
+    const text = await res.raw.text();
+    return text.length > viewableBytes
+      ? { text: text.slice(0, viewableBytes), truncated: true }
+      : { text, truncated: false };
+  });
+}
+
+/**
+ * A blob as bytes, to hand to the browser as a file.
+ *
+ * Not cached, unlike everything else read by digest. The others are kilobytes
+ * kept because they will be asked for again; this is however large the layer
+ * is, wanted once, and holding it after the download would be holding it for
+ * nothing.
+ */
+export async function readBlobBytes(client: RegistryClient, repository: string, digest: string): Promise<Blob> {
+  const res = await client.repo(repository).blobs.get(digest);
+  res.unwrap();
+
+  return await res.raw.blob();
+}
+
+const formatBytes = (bytes: number): string =>
+  bytes >= 1024 * 1024 ? `${Math.round(bytes / (1024 * 1024))} MiB` : `${Math.round(bytes / 1024)} KiB`;
 
 /** What a registry's error body says, if it is one and it says anything. */
 function describe(body: string): string | undefined {

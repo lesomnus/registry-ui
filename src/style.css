@@ -439,6 +439,29 @@ th.numeric {
   display: none;
 }
 
+/* A blob, or a manifest, shown as it is. Scrolls in place rather than
+   stretching the pane: some of these are a thousand lines. */
+pre.raw {
+  max-height: 60vh;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  font: 11.5px/1.5 var(--mono);
+  white-space: pre;
+  tab-size: 2;
+}
+
+/* The toggle beside a heading is not part of the heading. */
+h3 .linklike {
+  margin-left: 8px;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .panel {
   margin: 12px 0 4px;
   padding: 12px 14px;

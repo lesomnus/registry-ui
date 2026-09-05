@@ -54,3 +54,72 @@ export const sigstoreBundle = {
 
 /** The types that mean "this holds other manifests" rather than "this is an image". */
 export const indexMediaTypes = new Set<string>([vnd.oci.image.indexV1, vnd.docker.distribution.manifestListV2]);
+
+/**
+ * Whether a blob of this type is something to put on a screen.
+ *
+ * Asked of a layer before offering to show it. The suffix carries the answer
+ * more often than the type does -- `application/vnd.in-toto+json` and
+ * `application/vnd.dev.sigstore.bundle.v0.3+json` are both JSON and neither
+ * starts with `text/` or `application/json` -- so the structured suffix is what
+ * is read, which is what RFC 6838 put it there for.
+ *
+ * `application/octet-stream` is not text, even when it happens to be: it is
+ * what a pusher says when it is not saying, and guessing on its behalf turns a
+ * 60 MB binary into 60 MB of replacement characters.
+ */
+export function isTextual(mediaType: string | undefined): boolean {
+  const type = (mediaType ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
+  if (type === "") {
+    return false;
+  }
+
+  const suffix = type.includes("+") ? type.slice(type.lastIndexOf("+") + 1) : "";
+  if (suffix !== "") {
+    return ["json", "yaml", "xml", "toml"].includes(suffix);
+  }
+
+  return (
+    type.startsWith("text/") ||
+    ["application/json", "application/yaml", "application/x-yaml", "application/xml", "application/toml"].includes(type)
+  );
+}
+
+/** Whether it is JSON, and so worth indenting rather than showing as it came. */
+export const isJson = (mediaType: string | undefined): boolean => {
+  const type = (mediaType ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
+  return type === "application/json" || type.endsWith("+json");
+};
+
+/**
+ * What to call a downloaded blob when nothing else names it.
+ *
+ * A guess, and a shallow one: enough that a file manager opens the right thing,
+ * not enough to be worth a table of every type a registry might hold.
+ */
+export function extensionFor(mediaType: string | undefined): string {
+  const type = (mediaType ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
+  if (type.includes("tar+gzip") || type.includes("tar.gzip")) {
+    return ".tar.gz";
+  }
+  if (type.includes("tar+zstd")) {
+    return ".tar.zst";
+  }
+  if (type.endsWith("+gzip")) {
+    return ".gz";
+  }
+  if (type.includes("tar")) {
+    return ".tar";
+  }
+  if (isJson(type)) {
+    return ".json";
+  }
+  if (type.endsWith("+yaml") || type === "application/yaml" || type === "application/x-yaml") {
+    return ".yaml";
+  }
+  if (type.startsWith("text/")) {
+    return ".txt";
+  }
+
+  return "";
+}

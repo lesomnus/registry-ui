@@ -52,6 +52,39 @@ Adding a renderer is adding an entry to `artifactRenderers` in
 `src/render/artifact.ts`. An index is already a renderer in this sense — it is
 drawn as a platform table rather than as the JSON it is.
 
+## Looking at the bytes
+
+Under every one of those renderers is the same section: the layers, as things
+you can open rather than as digests.
+
+A layer whose media type is **text** — by the `+json`, `+yaml`, `+xml` or
+`+toml` suffix, or a `text/` type — has its name as a handle, and clicking it
+shows the blob. JSON is indented on the way out. An in-toto attestation and a
+sigstore bundle are both JSON without saying so in their type, which is what the
+structured suffix is for and why the suffix is what gets read.
+`application/octet-stream` is not text even when it happens to be: it is what a
+pusher says when it is not saying, and guessing turns a 60 MB binary into 60 MB
+of replacement characters.
+
+Every layer can be **saved**, named by `org.opencontainers.image.title` when the
+pusher left one — which `oras push` does, so an artifact comes down as the file
+it went up as:
+
+```
+Layer      Media type                  Digest        Size
+kamiadm    application/octet-stream    f3bc32e5f821  60 MiB   save
+```
+
+Nothing is fetched until something is clicked; a manifest already names its
+layers and their sizes. Anything over 1 MiB is offered as a download and not as
+a view — the size is checked from `Content-Length` before the body is read, so
+refusing one costs nothing. A blob the registry answers with a redirect to
+storage that sends no CORS headers will fail, and says so on the button.
+
+The manifest itself is at the bottom of every image, behind **show**. Everything
+above it is this page's reading of the manifest, and a reading leaves things
+out; those are also the exact bytes the digest was computed over.
+
 **Nothing here verifies anything.** The certificate is read, not checked: not
 the chain, not the dates, not the signature. It reports what a signature claims
 about itself, and `cosign verify` or `notation verify` is what decides whether
@@ -449,6 +482,7 @@ src/registry.ts      the client, and the credentials middleware
 src/catalog.ts       the repository list, followed to the end
 src/route.ts         the address bar, parsed as an image reference
 src/certificate.ts   the Fulcio extensions, read out of DER
+src/render/blob.ts   the layers, as things to view and to save
 src/render/          dom helpers, the image view, the artifact renderers
 server/main.ts       the page, and the forwarder
 ```

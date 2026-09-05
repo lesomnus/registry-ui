@@ -5,6 +5,7 @@ import type { Descriptor } from "./artifact";
 import { artifactName, isSignature, openArtifact } from "./artifact";
 import type { Cell } from "./dom";
 import { readBlob, readManifest } from "../manifest";
+import { layersSection, rawPane, type Layer } from "./blob";
 import { definitions, element, formatSize, shortDigest, table } from "./dom";
 
 type Child = {
@@ -14,8 +15,10 @@ type Child = {
 };
 type Manifest = {
   manifests?: Child[];
-  layers?: { digest: string; size?: number; mediaType?: string }[];
+  layers?: Layer[];
   config?: { digest?: string; size?: number };
+  /** What an ORAS artifact is, which is the only thing that says so. */
+  artifactType?: string;
 };
 type Config = { os?: string; architecture?: string; created?: string; config?: { Labels?: Record<string, string> } };
 
@@ -116,6 +119,39 @@ function attachedSection(
   });
 
   fragment.append(table(headers, rows), detail);
+  return fragment;
+}
+
+/**
+ * The manifest as it arrived, behind a toggle.
+ *
+ * Everything above it is this page's reading of the manifest, and a reading
+ * leaves things out -- an annotation nothing renders, a field from a spec this
+ * page has not heard of. Last, and closed, because it is what you open when the
+ * rendered answer did not have what you came for.
+ *
+ * The bytes are the ones the digest was computed over, so this is also the only
+ * place that shows exactly what was hashed.
+ */
+function manifestSection(body: string, mediaType: string): Node {
+  const fragment = document.createDocumentFragment();
+  const heading = element("h3", undefined, "Manifest");
+  const toggle = element("button", "linklike", "show");
+  heading.append(" ", toggle);
+
+  const pane = element("div", "artifact-detail");
+  toggle.addEventListener("click", () => {
+    if (pane.hasChildNodes()) {
+      pane.replaceChildren();
+      toggle.textContent = "show";
+      return;
+    }
+
+    pane.append(rawPane(body, mediaType));
+    toggle.textContent = "hide";
+  });
+
+  fragment.append(heading, pane);
   return fragment;
 }
 
@@ -227,6 +263,7 @@ export async function renderImage(
 
     badge.replaceChildren(signedBadge(attachments, isDigest(reference)));
     fragment.append(attachedSection(client, repository, attachments, true));
+    fragment.append(manifestSection(read.body, mediaType));
     return fragment;
   }
 
@@ -243,6 +280,9 @@ export async function renderImage(
     definitions([
       ["Digest", digest],
       ["Media type", mediaType],
+      // An artifact pushed by `oras` is an image manifest whose media type says
+      // nothing about it. This is the field that does.
+      ["Artifact type", manifest.artifactType],
       ["Platform", config?.os ? `${config.os}/${config.architecture ?? "?"}` : undefined],
       ["Created", config?.created ? new Date(config.created).toLocaleString() : undefined],
       ["Size", formatSize(transferSize(manifest))],
@@ -261,17 +301,7 @@ export async function renderImage(
     );
   }
 
-  fragment.append(element("h3", undefined, "Layers"));
-  fragment.append(
-    table(
-      [{ text: "Digest" }, { text: "Media type" }, { text: "Size", numeric: true }],
-      (manifest.layers ?? []).map((layer) => [
-        { text: shortDigest(layer.digest) },
-        { text: layer.mediaType ?? "-" },
-        { text: formatSize(layer.size), numeric: true },
-      ]),
-    ),
-  );
+  fragment.append(layersSection(client, repository, manifest.layers ?? []));
 
   const attachments =
     digest === undefined
@@ -283,5 +313,6 @@ export async function renderImage(
 
   badge.replaceChildren(signedBadge(attachments, isDigest(reference)));
   fragment.append(attachedSection(client, repository, attachments, false));
+  fragment.append(manifestSection(read.body, mediaType));
   return fragment;
 }

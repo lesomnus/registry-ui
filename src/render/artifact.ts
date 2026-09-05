@@ -3,7 +3,8 @@ import { sbom, vnd } from "@lesomnus/oci-client/media-types";
 import { base64ToBytes, readFulcioIdentity } from "../certificate";
 import { readBlob, readManifest } from "../manifest";
 import { sigstoreBundle } from "../media-types";
-import { definitions, element, externalLink, formatSize, shortDigest, table } from "./dom";
+import { layersSection, type Layer } from "./blob";
+import { definitions, element, externalLink, shortDigest, table } from "./dom";
 
 /** A descriptor as it appears in a referrers listing. */
 export type Descriptor = {
@@ -18,7 +19,7 @@ type Manifest = {
   mediaType?: string;
   artifactType?: string;
   subject?: { digest?: string };
-  layers?: { digest: string; size?: number; mediaType?: string }[];
+  layers?: Layer[];
   annotations?: Record<string, string>;
 };
 
@@ -170,7 +171,13 @@ function renderNotation(_client: RegistryClient, _repository: string, manifest: 
   return fragment;
 }
 
-/** What every artifact has, for the types this page does not know. */
+/**
+ * What every artifact has, for the types this page does not know.
+ *
+ * No layers here any more: `openArtifact` puts them under every renderer, so
+ * the type-specific ones say what they know and the layers are always there
+ * underneath, whether or not anything understood the type.
+ */
 export function renderUnknown(_client: RegistryClient, _repository: string, manifest: Manifest): Node {
   const fragment = document.createDocumentFragment();
   const annotations = Object.entries(manifest.annotations ?? {});
@@ -192,18 +199,6 @@ export function renderUnknown(_client: RegistryClient, _repository: string, mani
       ),
     );
   }
-
-  fragment.append(element("h3", undefined, "Layers"));
-  fragment.append(
-    table(
-      [{ text: "Digest" }, { text: "Media type" }, { text: "Size", numeric: true }],
-      (manifest.layers ?? []).map((layer) => [
-        { text: shortDigest(layer.digest) },
-        { text: layer.mediaType ?? "-" },
-        { text: formatSize(layer.size), numeric: true },
-      ]),
-    ),
-  );
 
   return fragment;
 }
@@ -232,7 +227,14 @@ export async function openArtifact(
     }
 
     const panel = element("div", "panel");
-    panel.append(element("h3", undefined, artifactName(descriptor)), rendered);
+    panel.append(
+      element("h3", undefined, artifactName(descriptor)),
+      rendered,
+      // Under every renderer, not only the fallback. A signature renderer says
+      // who signed it; the bundle it said that out of is a layer, and reading
+      // it is the difference between being told and looking.
+      layersSection(client, repository, manifest.layers ?? [], "Content"),
+    );
     into.replaceChildren(panel);
   } catch (error) {
     into.replaceChildren(element("p", "error", String((error as Error).message ?? error)));
