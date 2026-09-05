@@ -1,7 +1,7 @@
 import type { RegistryClient } from "../registry";
 import { sbom, vnd } from "@lesomnus/oci-client/media-types";
 import { base64ToBytes, readFulcioIdentity } from "../certificate";
-import { readBlob } from "../manifest";
+import { readBlob, readManifest } from "../manifest";
 import { sigstoreBundle } from "../media-types";
 import { definitions, element, externalLink, formatSize, shortDigest, table } from "./dom";
 
@@ -217,8 +217,12 @@ export async function openArtifact(
   into.replaceChildren(element("p", "loading", "Reading..."));
 
   try {
-    // The unwrapped result is the manifest; its body has already been read.
-    const manifest = (await client.repo(repository).manifests.get(descriptor.digest).unwrap()) as unknown as Manifest;
+    // Through readManifest rather than `manifests.get()`, for the reason in
+    // manifest.ts: the client attaches a 196-byte Accept, and a request header
+    // over 128 bytes is not CORS-safelisted, so in a browser that turns this
+    // into a preflight the registry then has to allow `accept` on. It also
+    // means an artifact opened twice is fetched once.
+    const manifest = (await readManifest(client, repository, descriptor.digest)).manifest as Manifest;
 
     let rendered: Node;
     try {

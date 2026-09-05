@@ -16,9 +16,16 @@ import type { RegistryClient } from "./registry";
  * trusting it: a registry that reports a digest its own bytes do not have is
  * saying something worth knowing.
  *
- * Read through `client.transport` rather than `manifests.get()` because the
- * bytes matter: `get()` parses the body, and a digest over re-serialised JSON
- * is a digest of something else.
+ * Read through `client.transport` rather than `manifests.get()` for two
+ * reasons. The bytes matter -- `get()` parses the body, and a digest over
+ * re-serialised JSON is a digest of something else. And `get()` attaches an
+ * `Accept` naming the four manifest types, which is 196 bytes; a request header
+ * over 128 is not CORS-safelisted, so in a browser it turns every manifest
+ * request into a preflight that the registry has to allow `accept` on. zot does
+ * not, and the request fails before it is sent.
+ *
+ * **Every manifest read goes through here**, including the ones behind
+ * `openArtifact`, or that comes back.
  */
 
 export type ReadManifest = {

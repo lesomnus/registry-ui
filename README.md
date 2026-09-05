@@ -354,6 +354,11 @@ index, a Docker manifest list and a schema1 image: every registry answered with
 the same media type whether it was sent the full list, the two OCI types, `*/*`,
 or nothing. A registry returns what it has.
 
+oci-client's `manifests.get()` attaches the same 196-byte list of its own, so
+**every manifest read here goes through `readManifest`** instead — which reads
+it off the transport, and gets the computed digest and the cache along the way.
+Reported as lesomnus/oci-client#3.
+
 Tick **http** for a registry with no TLS, which is most of them on your own
 machine. The scheme is rewritten on the way out, so nothing above has to know.
 
