@@ -245,17 +245,46 @@ body {
  */
 main {
   display: grid;
-  grid-template-columns: 300px 200px minmax(0, 1fr);
+  grid-template-columns: 300px 200px minmax(420px, 560px) minmax(0, 1fr);
   gap: 1px;
   flex: 1;
   min-height: 0;
   background: var(--border);
 }
 
-@media (max-width: 860px) {
+/*
+ * Not enough room for four, so the manifest goes back to the bottom of the
+ * image and the image takes what is left.
+ */
+@media (max-width: 1240px) {
   main {
-    grid-template-columns: 200px 150px minmax(0, 1fr);
+    grid-template-columns: 300px 200px minmax(0, 1fr);
   }
+
+  .pane.source {
+    display: none;
+  }
+}
+
+/* The pane is the manifest, so the copy at the bottom of the image is not. */
+@media (min-width: 1241px) {
+  .manifest-inline {
+    display: none;
+  }
+}
+
+.pane.source #manifest {
+  flex: 1;
+  padding: 4px 12px 16px;
+  overflow: auto;
+}
+
+/* It has the pane; it does not need a box inside it as well. */
+.pane.source pre.raw {
+  max-height: none;
+  border: 0;
+  padding: 6px 0;
+  background: none;
 }
 
 .pane {
@@ -302,18 +331,6 @@ h2 {
 .toggle[aria-pressed="true"] {
   border-color: var(--accent);
   background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.caret {
-  flex: none;
-  width: 12px;
-  color: var(--text-muted);
-  font-size: 9px;
-  text-align: center;
-}
-
-.caret:hover {
   color: var(--accent);
 }
 
@@ -502,10 +519,11 @@ th.numeric {
   font-size: 13px;
 }
 
+/* One column, and the lists give up most of their height to the image. */
 @media (max-width: 900px) {
   main {
     grid-template-columns: 1fr;
-    height: auto;
+    overflow-y: auto;
   }
 
   .list {

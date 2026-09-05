@@ -64,6 +64,13 @@ export function buildTree(names: string[]): Node {
  * A group with one child and nothing of its own is folded into its child --
  * `dist/external/docker.io/library` is four clicks to say one thing otherwise.
  * The label carries the whole run and the path stays exact.
+ *
+ * A name that is both a repository and a prefix -- `hello` beside
+ * `hello/world` -- gets **two rows**, the image and then the folder that
+ * happens to share its name. It was one row doing two things, where the name
+ * opened the image and a caret beside it opened the group, and the only way to
+ * know that was to have been told. Two rows say it: one has the image icon and
+ * opens an image, the other has a folder, a trailing slash, and opens.
  */
 export function flattenTree(
   root: Node,
@@ -89,7 +96,10 @@ export function flattenTree(
         label = `${label}/${only.segment}`;
       }
 
-      if (folded.children.size === 0) {
+      // The image, if this path names one. First, so that a folder sharing the
+      // name is followed by its own contents rather than by something that is
+      // not in it.
+      if (folded.leaf) {
         rows.push({
           key: folded.path,
           path: folded.path,
@@ -101,47 +111,29 @@ export function flattenTree(
           current: isCurrent(folded.path),
           onSelect: () => onSelectRepository(folded.path),
         });
+      }
+
+      if (folded.children.size === 0) {
         continue;
       }
 
+      // The folder. Its whole row opens it -- there is nothing else it could
+      // mean -- and the slash on the label is what distinguishes `hello/` from
+      // the `hello` that may be sitting right above it.
       const groupPath = `${folded.path}/`;
       const open = expanded.has(groupPath);
-
-      // A path can be a repository *and* a prefix -- `hello` beside
-      // `hello/world`. That is one row doing two things rather than two rows
-      // saying the same name: the caret opens the group, the name opens the
-      // image. A prefix that is not also a repository has nothing to select, so
-      // the whole row toggles.
-      rows.push(
-        folded.leaf
-          ? {
-              key: folded.path,
-              path: folded.path,
-              group: false,
-              label,
-              kind: "repository",
-              matches: matchesOf(label),
-              depth,
-              expandable: true,
-              expanded: open,
-              current: isCurrent(folded.path),
-              onSelect: () => onSelectRepository(folded.path),
-              onToggle: () => onToggleGroup(groupPath),
-            }
-          : {
-              key: groupPath,
-              path: groupPath,
-              group: true,
-              label,
-              kind: "group",
-              matches: matchesOf(label),
-              depth,
-              expandable: true,
-              expanded: open,
-              current: false,
-              onSelect: () => onToggleGroup(groupPath),
-            },
-      );
+      rows.push({
+        key: groupPath,
+        path: groupPath,
+        group: true,
+        label: `${label}/`,
+        kind: "group",
+        matches: matchesOf(label),
+        depth,
+        expanded: open,
+        current: false,
+        onSelect: () => onToggleGroup(groupPath),
+      });
 
       if (open) {
         walk(folded, depth + 1);

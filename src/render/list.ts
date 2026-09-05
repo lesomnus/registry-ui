@@ -31,7 +31,7 @@ export type Row = {
   onSelect: () => void;
   /** How far in to indent it, for a tree. */
   depth?: number;
-  expandable?: boolean;
+  /** Drawn as an open folder. Groups only. */
   expanded?: boolean;
   /** What the row is, which decides its icon. */
   kind?: "repository" | "group";
@@ -39,12 +39,6 @@ export type Row = {
   matches?: [number, number][];
   /** Said quietly beside the label: where a row came from, mostly. */
   note?: string;
-  /**
-   * Set when the row is both a group and a thing to select: the caret then
-   * toggles and everything else selects. Unset on a plain group, where the
-   * whole row toggles because there is nothing else it could do.
-   */
-  onToggle?: () => void;
 };
 
 /**
@@ -217,25 +211,12 @@ function rowElement(row: Row): HTMLElement {
     button.style.backgroundSize = `${depth * indent}px 100%`;
   }
 
-  if (row.expandable) {
-    // A caret rather than a disclosure widget: it has to fit in a fixed-height
-    // row, and pointing at what it will do is the whole job.
-    const caret = element("span", "caret", row.expanded ? "\u25be" : "\u25b8");
-    if (row.onToggle !== undefined) {
-      // The row is a repository *and* a prefix. Clicking the name opens the
-      // image; only the caret opens the group.
-      const toggle = row.onToggle;
-      caret.addEventListener("click", (event) => {
-        event.stopPropagation();
-        toggle();
-      });
-    }
-
-    button.append(caret);
-  }
-
+  // No caret. It was 12px plus the gap -- exactly one level of indent -- and
+  // only expandable rows had one, so a folder's name sat one level deeper than
+  // the names beside it and read as their child. A folder is now a row that
+  // opens when clicked, and the icon says whether it is open.
   if (row.kind !== undefined) {
-    button.append(icon(row.kind));
+    button.append(icon(row.kind, row.expanded === true));
   }
 
   button.append(labelElement(row.label, row.matches));
@@ -280,12 +261,13 @@ function labelElement(label: string, matches?: [number, number][]): HTMLElement 
 }
 
 /**
- * A folder or an image.
+ * A folder, open or shut, or an image.
  *
- * Inline rather than a font or a sprite: two shapes, drawn in `currentColor` so
- * they follow the row, and nothing to load.
+ * Inline rather than a font or a sprite: three shapes, drawn in `currentColor`
+ * so they follow the row, and nothing to load. The open folder is what a caret
+ * used to say, in the space the row already spends on an icon.
  */
-function icon(kind: "repository" | "group"): SVGSVGElement {
+function icon(kind: "repository" | "group", open = false): SVGSVGElement {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("class", "icon");
   svg.setAttribute("viewBox", "0 0 16 16");
@@ -294,11 +276,14 @@ function icon(kind: "repository" | "group"): SVGSVGElement {
   const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
   path.setAttribute(
     "d",
-    kind === "group"
-      ? // A folder.
-        "M1.75 3h3.9a1 1 0 0 1 .7.3L7.6 4.5h6.65a.75.75 0 0 1 .75.75v7A1.75 1.75 0 0 1 13.25 14H2.75A1.75 1.75 0 0 1 1 12.25V3.75A.75.75 0 0 1 1.75 3Z"
-      : // A box, seen from above: what an image is drawn as everywhere else.
-        "M8 1.2 14.4 4.6v6.8L8 14.8 1.6 11.4V4.6Zm0 1.7L3.6 5.2 8 7.5l4.4-2.3Zm-5 3.6v4.2l4.25 2.25V9.1Zm10 0L8.75 9.1v3.85L13 10.7Z",
+    kind !== "group"
+      ? // A box, seen from above: what an image is drawn as everywhere else.
+        "M8 1.2 14.4 4.6v6.8L8 14.8 1.6 11.4V4.6Zm0 1.7L3.6 5.2 8 7.5l4.4-2.3Zm-5 3.6v4.2l4.25 2.25V9.1Zm10 0L8.75 9.1v3.85L13 10.7Z"
+      : open
+        ? // The same folder, tipped open.
+          "M1.75 3h3.9a1 1 0 0 1 .7.3L7.6 4.5h5.65a.75.75 0 0 1 .75.75V6.5H5.3a1.5 1.5 0 0 0-1.44 1.08L2.4 12.5a.6.6 0 0 1-.58.43A.85.85 0 0 1 1 12.1V3.75A.75.75 0 0 1 1.75 3Zm3.55 4.5h9.2a.6.6 0 0 1 .575.775l-1.35 4.5A1.5 1.5 0 0 1 12.29 14H2.9l1.96-5.42A.5.5 0 0 1 5.3 7.5Z"
+        : // Shut.
+          "M1.75 3h3.9a1 1 0 0 1 .7.3L7.6 4.5h6.65a.75.75 0 0 1 .75.75v7A1.75 1.75 0 0 1 13.25 14H2.75A1.75 1.75 0 0 1 1 12.25V3.75A.75.75 0 0 1 1.75 3Z",
   );
   svg.append(path);
   return svg;

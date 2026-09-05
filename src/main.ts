@@ -8,6 +8,7 @@ import { ancestorsOf, buildTree, flattenTree } from "./render/tree";
 import { listTags } from "./tags";
 import { connect, connectionOf, type Connection, type RegistryClient } from "./registry";
 import { Search, type RepoSummary } from "./search";
+import { rawPane } from "./render/blob";
 import { element } from "./render/dom";
 import { renderImage } from "./render/image";
 import { formatRoute, parseRoute, type Route } from "./route";
@@ -38,6 +39,8 @@ const el = {
   tagList: document.getElementById("tag-list") as HTMLElement,
   tagCount: document.getElementById("tag-count") as HTMLElement,
   detail: document.getElementById("detail") as HTMLElement,
+  manifest: document.getElementById("manifest") as HTMLElement,
+  manifestType: document.getElementById("manifest-type") as HTMLElement,
 };
 
 const state: {
@@ -323,10 +326,7 @@ function renderRepositories(): void {
         // Toggling moves everything below it, and the thing that was clicked is
         // what the eye is on -- so it is held exactly where it is rather than
         // the top row being held, which would lift it to the top.
-        //
-        // A group that is also a repository is keyed by its own path, not the
-        // path with the slash, so both are looked for.
-        const held = listAnchor(el.repositoryList, path) ?? listAnchor(el.repositoryList, path.replace(/\/$/, ""));
+        const held = listAnchor(el.repositoryList, path);
         if (state.expanded.has(path)) {
           state.expanded.delete(path);
         } else {
@@ -502,10 +502,12 @@ async function showDetail(generation: number): Promise<void> {
   }
 
   if (reference === undefined) {
+    showManifest();
     el.detail.replaceChildren(element("p", "empty", "Pick a tag."));
     return;
   }
 
+  showManifest();
   el.detail.replaceChildren(element("p", "loading", "Reading manifest..."));
 
   try {
@@ -519,14 +521,28 @@ async function showDetail(generation: number): Promise<void> {
       return;
     }
 
-    el.detail.replaceChildren(trail(repository, reference), rendered);
+    el.detail.replaceChildren(trail(repository, reference), rendered.view);
+    showManifest(rendered.body, rendered.mediaType);
   } catch (error) {
     if (generation !== state.generation) {
       return;
     }
 
     el.detail.replaceChildren(trail(repository, reference), element("p", "error", message(error)));
+    showManifest();
   }
+}
+
+/**
+ * Fills the manifest pane, which is the same bytes the image was read from.
+ *
+ * Given rather than read: a manifest asked for by tag is not cached, since a
+ * tag is a name somebody can move, so asking a second time here would be
+ * fetching it a second time.
+ */
+function showManifest(body?: string, mediaType?: string): void {
+  el.manifestType.textContent = body === undefined ? "" : (mediaType ?? "");
+  el.manifest.replaceChildren(body === undefined ? element("p", "empty", "Pick a tag.") : rawPane(body, mediaType));
 }
 
 /**

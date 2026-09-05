@@ -79,6 +79,19 @@
         <div class="pane-head"><h2>Image</h2></div>
         <div id="detail"><p class="empty">Pick a tag.</p></div>
       </section>
+
+      <!--
+        The manifest, when the window is wide enough to have it open beside the
+        reading of it rather than underneath. Below that width the stylesheet
+        drops this pane and the section at the bottom of the image takes over.
+      -->
+      <section class="pane source">
+        <div class="pane-head">
+          <h2>Manifest</h2>
+          <span class="count" id="manifest-type"></span>
+        </div>
+        <div id="manifest"><p class="empty">Pick a tag.</p></div>
+      </section>
     </main>
 
     <script type="module" src="/src/main.ts"></script>

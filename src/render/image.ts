@@ -23,6 +23,14 @@ type Manifest = {
 type Config = { os?: string; architecture?: string; created?: string; config?: { Labels?: Record<string, string> } };
 
 /**
+ * The rendered view, and the bytes it was rendered from.
+ *
+ * The bytes travel with it because the manifest pane wants the same ones and a
+ * tag is not cached -- asking twice would be reading it twice.
+ */
+export type RenderedImage = { view: Node; body: string; mediaType: string };
+
+/**
  * Buildkit rides its attestations in an index as children with no real
  * platform. `unknown/unknown` is how the spec lets them travel, not a
  * description of anything.
@@ -132,9 +140,14 @@ function attachedSection(
  *
  * The bytes are the ones the digest was computed over, so this is also the only
  * place that shows exactly what was hashed.
+ *
+ * Hidden by the stylesheet when the window is wide enough for the manifest to
+ * have a pane of its own, which is the same content in a better place. It is
+ * rendered either way because it costs nothing: the bytes are already here.
  */
 function manifestSection(body: string, mediaType: string): Node {
   const fragment = document.createDocumentFragment();
+  const wrap = element("div", "manifest-inline");
   const heading = element("h3", undefined, "Manifest");
   const toggle = element("button", "linklike", "show");
   heading.append(" ", toggle);
@@ -151,7 +164,8 @@ function manifestSection(body: string, mediaType: string): Node {
     toggle.textContent = "hide";
   });
 
-  fragment.append(heading, pane);
+  wrap.append(heading, pane);
+  fragment.append(wrap);
   return fragment;
 }
 
@@ -168,7 +182,7 @@ export async function renderImage(
   repository: string,
   reference: string,
   open: (digest: string) => void,
-): Promise<Node> {
+): Promise<RenderedImage> {
   // `unwrap()` has already read the body, and the result *is* the manifest with
   // `raw` and `as()` laid over it. Asking `raw.json()` again throws.
   // Read for its bytes, so the digest is computed rather than taken on trust --
@@ -264,7 +278,7 @@ export async function renderImage(
     badge.replaceChildren(signedBadge(attachments, isDigest(reference)));
     fragment.append(attachedSection(client, repository, attachments, true));
     fragment.append(manifestSection(read.body, mediaType));
-    return fragment;
+    return { view: fragment, body: read.body, mediaType };
   }
 
   let config: Config | undefined;
@@ -314,5 +328,5 @@ export async function renderImage(
   badge.replaceChildren(signedBadge(attachments, isDigest(reference)));
   fragment.append(attachedSection(client, repository, attachments, false));
   fragment.append(manifestSection(read.body, mediaType));
-  return fragment;
+  return { view: fragment, body: read.body, mediaType };
 }

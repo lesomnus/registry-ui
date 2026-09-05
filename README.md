@@ -123,10 +123,17 @@ The corner speaks only when there is something to say. "221 repositories" is
 written on the pane that lists them; a failure, and the reason a registry would
 not list, get the corner.
 
-The two lists are a fixed width and the image pane takes the rest. They were
-fractions, which on a wide screen spent half the window on two columns of short
-names: a repository name and a tag have a length, and the manifest below them
-does not.
+**Four panes, three of them a fixed width.** The two lists and the image have a
+size that suits what is in them — a repository name, a tag, and a definition
+list are all things with a length — and the manifest takes whatever is left.
+
+That last pane is what the width was going to. The manifest was already at the
+bottom of the image behind a toggle, which is the right content in the wrong
+place: it is what you check the rendered view _against_, so it wants to be
+beside it rather than under it. Below 1240px there is not room for four, the
+pane goes, and the section at the bottom of the image takes over — it is
+rendered either way, since the bytes are already in hand, and the stylesheet
+decides which one you see.
 
 ## The address is a reference
 
@@ -391,6 +398,17 @@ than four clicks.
 A repository named in the address is revealed rather than merely selected — the
 groups above it are opened and the list scrolls to it, unless it was already on
 screen, because a row you can see should not move when you click it.
+
+**A name can be a repository and a prefix at once** — `ci` beside `ci/build` —
+and those are two rows, an image and a folder that happens to share its name.
+One row doing both meant the name opened the image and a caret beside it opened
+the group, which is not something anybody works out by looking. The rows are
+told apart by their icon and by the slash the folder carries.
+
+There is no caret. It was twelve pixels plus a gap — exactly one level of indent
+— and only folders had one, so a folder's name sat a level deeper than the names
+beside it and read as their child. A folder is a row that opens when clicked and
+its icon says whether it is open, which is what the caret was for.
 
 **Switching keeps your place.** The row at the top of the viewport is put back
 under the same pixel: going to the tree opens whatever groups have to be open
