@@ -388,22 +388,37 @@ somewhere else.
 A registry with no referrers API is handled inside the client, by the referrers
 tag schema. This page does not know which kind it is talking to.
 
-**Manifest requests send no `Accept`**, which is the opposite of what the spec
-suggests and the right thing here. Naming the four types a page can read is 196
-bytes, a request header over **128** is not CORS-safelisted, and a page is then
-preflighting every manifest — which the registry has to allow `accept` on. zot
-does not, so browsing one directly failed on every manifest with _"Request
-header field accept is not allowed by Access-Control-Allow-Headers"_.
+**What a manifest asks for depends on how it is asked.** Naming the four types a
+page can read is 196 bytes, a request header over **128** is not CORS-safelisted,
+and a page is then preflighting every manifest — which the registry has to allow
+`accept` on. zot does not, so browsing one directly failed on every manifest
+with _"Request header field accept is not allowed by Access-Control-Allow-Headers"_.
 
-It bought nothing anyway. Measured against Docker Hub and zot, over a modern
-index, a Docker manifest list and a schema1 image: every registry answered with
-the same media type whether it was sent the full list, the two OCI types, `*/*`,
-or nothing. A registry returns what it has.
+This used to say the header bought nothing — that a registry returns what it
+has. That was measured against two registries and generalised to all of them,
+and it is false. A registry may answer `404` for a manifest it cannot represent
+as something you said you would take:
 
-oci-client's `manifests.get()` attaches the same 196-byte list of its own, so
-**every manifest read here goes through `readManifest`** instead — which reads
-it off the transport, and gets the computed digest and the cache along the way.
-Reported as lesomnus/oci-client#3.
+| `Accept`             | ghcr.io | registry.k8s.io | Docker Hub | zot |
+| -------------------- | ------- | --------------- | ---------- | --- |
+| nothing              | **404** | 200             | 200        | 200 |
+| the two OCI types    | 200     | **404**         | 200        | 200 |
+| all four (196 bytes) | 200     | 200             | 200        | 200 |
+
+Nothing under 128 bytes reads both `ghcr.io` and `registry.k8s.io`: the limit
+fits two types and no pair is right everywhere. So the choice is per connection.
+**Through the forwarder, the full list** — it allows `accept` in its preflight,
+and the registries that need those bytes are the ones only reachable that way.
+**Direct from the page, nothing**, which stays safelisted; what that gives up is
+`ghcr.io`, which sends no CORS headers at all and so is not reachable directly
+whatever is sent.
+
+oci-client 1.0.0 offered no way to say — its `manifests.get()` attached the full
+list and that was that ([#3](https://github.com/lesomnus/oci-client/issues/3)).
+1.0.1 added the `accept` option and documented the `Accept` middleware, which is
+what makes the split above possible. **Every manifest read here still goes
+through `readManifest`**, because the digest has to be computed over the bytes
+as they arrived, and that also gets the cache.
 
 Tick **http** for a registry with no TLS, which is most of them on your own
 machine. The scheme is rewritten on the way out, so nothing above has to know.
@@ -422,7 +437,7 @@ and conclude the same thing.
 
 ## Installing it
 
-oci-client is `^1.0.0` from npm. It used to be a git dependency pinned to a
+oci-client is `^1.0.1` from npm. It used to be a git dependency pinned to a
 commit, because npm had only 0.0.1 from 2024; there is a release now and the
 workaround is gone.
 

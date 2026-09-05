@@ -1,4 +1,4 @@
-import { ClientV2, TransportAuthorizer, Unsecure, ext } from "@lesomnus/oci-client";
+import { Accept, ClientV2, ManifestMediaTypes, TransportAuthorizer, Unsecure, ext } from "@lesomnus/oci-client";
 import type { ClientInit, Transport, TransportMiddleware } from "@lesomnus/oci-client";
 import { DirectTransport, ProxyTransport } from "./transport";
 
@@ -50,14 +50,30 @@ export function connectionOf(connection: Connection): [string, ClientInit] {
       ? { username: connection.username, password: connection.password }
       : undefined;
 
-  // No `Accept`, on purpose. See src/media-types.ts.
+  const authorizer = new TransportAuthorizer({ credential });
+
+  // What a manifest is asked for, which is a different question in each mode.
+  // Through a forwarder the full list is both correct and affordable; direct
+  // from the page it is 68 bytes too long to send. See src/media-types.ts.
   //
+  // The middleware rather than the per-call option, because manifests are read
+  // through `transport.fetch` rather than through `manifests.get()` -- see
+  // manifest.ts -- and this is the one seam both go through.
+  //
+  // Direct means no middleware, which leaves `manifests.get()` sending its own
+  // 196 bytes: the middleware can narrow that list but has no way to say "send
+  // none". Nothing here calls it, and manifest.ts is where that is kept true.
+  const accept = connection.direct ? [] : [new Accept({ manifests: [...ManifestMediaTypes] })];
+
   // Unsecure is last, on the way out, so everything above it goes on building
   // https URLs and does not have to know.
-  const authorizer = new TransportAuthorizer({ credential });
-  const transport: [TransportMiddleware, ...TransportMiddleware[], Transport] = connection.insecure
-    ? [authorizer, new Unsecure(), wire]
-    : [authorizer, wire];
+  const unsecure = connection.insecure ? [new Unsecure()] : [];
+  const transport: [TransportMiddleware, ...TransportMiddleware[], Transport] = [
+    authorizer,
+    ...accept,
+    ...unsecure,
+    wire,
+  ];
 
   return [connection.domain, { transport }];
 }

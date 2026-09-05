@@ -16,13 +16,16 @@ import type { RegistryClient } from "./registry";
  * trusting it: a registry that reports a digest its own bytes do not have is
  * saying something worth knowing.
  *
- * Read through `client.transport` rather than `manifests.get()` for two
- * reasons. The bytes matter -- `get()` parses the body, and a digest over
- * re-serialised JSON is a digest of something else. And `get()` attaches an
- * `Accept` naming the four manifest types, which is 196 bytes; a request header
- * over 128 is not CORS-safelisted, so in a browser it turns every manifest
- * request into a preflight that the registry has to allow `accept` on. zot does
- * not, and the request fails before it is sent.
+ * Read through `client.transport` rather than `manifests.get()` because the
+ * bytes matter: `get()` parses the body, and a digest over re-serialised JSON
+ * is a digest of something else.
+ *
+ * That is now the only reason. It was also the way around the 196-byte `Accept`
+ * that `get()` attaches, which a browser will not send to a registry that does
+ * not allow the header -- but oci-client 1.0.1 lets a caller choose, and what
+ * to choose turned out not to be "nothing". The choice is made once per
+ * connection, as a transport middleware, so it reaches these requests too. See
+ * media-types.ts for the measurements and registry.ts for the choice.
  *
  * **Every manifest read goes through here**, including the ones behind
  * `openArtifact`, or that comes back.
@@ -63,11 +66,7 @@ export async function readManifest(
   return await fetchManifest(client, repository, reference);
 }
 
-async function fetchManifest(
-  client: RegistryClient,
-  repository: string,
-  reference: string,
-): Promise<ReadManifest> {
+async function fetchManifest(client: RegistryClient, repository: string, reference: string): Promise<ReadManifest> {
   const url = `https://${client.domain}/v2/${repository}/manifests/${reference}`;
   const res = await client.transport.fetch(url, {
     method: "GET",

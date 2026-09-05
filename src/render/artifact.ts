@@ -47,7 +47,8 @@ const artifactNames: Record<string, string> = {
 
 export const typeOf = (descriptor: Descriptor): string => descriptor.artifactType ?? descriptor.mediaType ?? "";
 
-export const artifactName = (descriptor: Descriptor): string => artifactNames[typeOf(descriptor)] ?? typeOf(descriptor) ?? "-";
+export const artifactName = (descriptor: Descriptor): string =>
+  artifactNames[typeOf(descriptor)] ?? typeOf(descriptor) ?? "-";
 
 /** The types this page calls a signature, which is what the badge counts. */
 const signatureTypes = new Set<string>([
@@ -218,10 +219,8 @@ export async function openArtifact(
 
   try {
     // Through readManifest rather than `manifests.get()`, for the reason in
-    // manifest.ts: the client attaches a 196-byte Accept, and a request header
-    // over 128 bytes is not CORS-safelisted, so in a browser that turns this
-    // into a preflight the registry then has to allow `accept` on. It also
-    // means an artifact opened twice is fetched once.
+    // manifest.ts: the digest has to be computed over the bytes as they
+    // arrived. It also means an artifact opened twice is fetched once.
     const manifest = (await readManifest(client, repository, descriptor.digest)).manifest as Manifest;
 
     let rendered: Node;
