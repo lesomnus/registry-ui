@@ -606,6 +606,8 @@ async function loadTags(repository: string, generation: number): Promise<void> {
         return;
       }
 
+      // Appended, so nothing above moves; held anyway because a filter typed
+      // mid-walk redraws through here too, and that can shorten the list.
       const held = listAnchor(el.tagList);
       state.tags = page.items;
       renderTags();
@@ -613,7 +615,6 @@ async function loadTags(repository: string, generation: number): Promise<void> {
         scrollListTo(el.tagList, held);
       }
     },
-    (a, b) => a.localeCompare(b),
   );
 
   state.tagsOf = page;
@@ -876,9 +877,10 @@ async function list(client: RegistryClient): Promise<void> {
         return;
       }
 
-      // Drawn as each page arrives, holding the scroll: `_catalog` is not
-      // ordered by any spec, so a late name can land above the one being read,
-      // and the anchor is what keeps it from moving.
+      // Drawn as each page arrives. A page only ever appends now, so the flat
+      // list cannot move under anybody -- but the tree still can: it sorts its
+      // children, so a name arriving late can open a group above the one being
+      // read. The anchor is for that.
       const held = listAnchor(el.repositoryList);
       state.repositories = page.items;
       renderRepositories();
@@ -886,7 +888,6 @@ async function list(client: RegistryClient): Promise<void> {
         scrollListTo(el.repositoryList, held);
       }
     },
-    (a, b) => a.localeCompare(b),
   );
 
   state.catalog = page;

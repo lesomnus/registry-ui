@@ -487,6 +487,22 @@ is all there is or a `Link` says otherwise, which is worth inferring because
 `Link` is usually unreadable in a browser and without it every list paid one
 round trip to be told nothing.
 
+**Pages append; nothing is re-sorted.** The registry's order is the only
+self-consistent one, because paging is `last=<the last name of the last page>`
+— the sequence it walks in _is_ the sequence the cursor steps through, and
+sorting it back makes the display disagree with the pagination it came from.
+This one lists `hday/welcome` before `hday-jp72-base`, comparing something other
+than bytes, and that is what you see. Tags need no help: the spec says three
+times they MUST come back in lexical order.
+
+New items are the ones not already in the set that dedupes them, and a `Set`
+keeps insertion order — so the collected list is arrival order with no second
+structure to keep in step. Dedupe is not paranoia: a registry whose cursor is an
+object key rather than a name can hand back an overlap, and it is also the
+loop-breaker, since a page that adds nothing is a walk that is not advancing.
+
+The tree still sorts, because its order is the paths rather than the listing.
+
 **Typing pulls the rest of the list down.** A filter over the first page is a
 wrong answer, not a partial one, so the walk resumes in the background — nothing
 waits for it, and the matches among what has arrived are drawn at once. The

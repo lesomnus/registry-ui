@@ -10,16 +10,31 @@
  * the end of what it has, and a filter asks for all of it, because a filter
  * over a tenth of the names is a wrong answer rather than a partial one.
  *
- * # Why the collected list is still sorted
+ * # The order is the registry's, and pages only ever append
  *
- * Tags come back in lexical order because the spec says three times that they
- * MUST. `_catalog` is not in the spec at all -- it is a registry extension --
- * and the one this fleet runs is *nearly* sorted and not quite: it puts
- * `hday/welcome` before `hday-jp72-base`, having compared something other than
- * bytes. So the collected names are sorted here rather than trusted, which
- * costs a sort of what is already in memory and means a late page can land in
- * the middle. That is already handled: every redraw holds the scroll anchor,
- * so a row arriving above the one you are reading does not move it.
+ * This used to sort what it had collected, which meant a late page could land
+ * in the middle of a list somebody was reading. It no longer does, for a reason
+ * better than taste: **the registry's order is the only self-consistent one.**
+ * Paging is `last=<the last item of the previous page>`, so the sequence the
+ * registry walks in *is* the sequence the cursor steps through. Re-sorting
+ * fights that. The one this fleet runs puts `hday/welcome` before
+ * `hday-jp72-base` -- it compares something other than bytes -- and sorting
+ * that back made the display disagree with the pagination it came from.
+ *
+ * Tags need no help anyway: the spec says three times that they MUST come back
+ * in lexical order.
+ *
+ * # Knowing what is new
+ *
+ * The set that dedupes is also the answer to that: an item already in it has
+ * been seen, and one that is not is appended. A `Set` keeps insertion order, so
+ * the collected list is arrival order for free -- there is no second structure
+ * and nothing to keep in step.
+ *
+ * Dedupe is not paranoia. A registry whose cursor is an object key rather than
+ * a name can hand back an overlap, and a tag written while the walk is in
+ * progress can appear on two pages. It is also the loop-breaker: a page that
+ * adds nothing is a walk that is not advancing.
  */
 
 export type Page<T> = {
@@ -29,7 +44,7 @@ export type Page<T> = {
 };
 
 export type Pager<T> = {
-  /** Everything collected so far, sorted. */
+  /** Everything collected so far, in the order the registry listed it. */
   readonly items: T[];
   /** No more pages: what is here is all of it. */
   readonly done: boolean;
@@ -55,11 +70,10 @@ export type Pager<T> = {
 export function pager<T>(
   fetchPage: (cursor: string | undefined) => Promise<Page<T>>,
   onPage: () => void,
-  compare: (a: T, b: T) => number,
   maxPages = 1000,
 ): Pager<T> {
   const collected = new Set<T>();
-  let items: T[] = [];
+  const items: T[] = [];
   let cursor: string | undefined;
   let done = false;
   let pages = 0;
@@ -69,25 +83,32 @@ export function pager<T>(
     const page = await fetchPage(cursor);
     pages++;
 
-    const before = collected.size;
+    // Appended in the order they arrived, and only the ones not already here.
+    // The set is what "already here" means; nothing else has to track it.
+    let added = 0;
     for (const item of page.items) {
+      if (collected.has(item)) {
+        continue;
+      }
+
       collected.add(item);
+      items.push(item);
+      added++;
     }
 
     // A cursor that does not move, or a page that adds nothing, is a registry
     // that would otherwise be asked forever.
     const next = page.cursor;
-    if (next === undefined || next === cursor || collected.size === before || pages >= maxPages) {
+    if (next === undefined || next === cursor || added === 0 || pages >= maxPages) {
       done = true;
     } else {
       cursor = next;
     }
 
-    if (collected.size === before) {
+    if (added === 0) {
       return false;
     }
 
-    items = [...collected].sort(compare);
     onPage();
     return true;
   };
