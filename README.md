@@ -532,6 +532,21 @@ there, so the scrollbar and `Home` and `End` behave.
 `rowHeight` in `src/render/list.ts` and the row height in the stylesheet have to
 agree — the window is positioned by multiplying it.
 
+**Every pane that scrolls fades at the edge it is scrolled past**, in the pane's
+own colour, so a list with more above it does not look like a list that starts
+there. It follows the scroll rather than switching on: one pixel in is one pixel
+of fade, reaching full depth over 28. A fade that arrives whole the moment you
+touch the wheel is a flicker.
+
+It is a `mask`, which is neither of the two obvious things. The fade has to be
+_over_ the content — the point is that the content disappears into the
+background — so a background gradient is behind everything and wrong, and an
+overlay needs somewhere to live in a pane that has nowhere to put one. A mask is
+two custom properties and no markup, and what sets them is watched rather than
+reported: a scroll, a `ResizeObserver` for the pane changing size, and a
+`MutationObserver` for the list growing a page, so nothing has to remember to
+call it after a render.
+
 ## How it talks to a registry
 
 Through [`@lesomnus/oci-client`](https://github.com/lesomnus/oci-client), which
@@ -616,6 +631,7 @@ src/catalog.ts       the repository list, followed to the end
 src/route.ts         the address bar, parsed as an image reference
 src/certificate.ts   the Fulcio extensions, read out of DER
 src/render/blob.ts   the layers, as things to view and to save
+src/render/fade.ts   the edge a scroll is hiding, faded into the pane
 src/render/highlight.ts  JSON and YAML, coloured without a dependency
 src/render/          dom helpers, the image view, the artifact renderers
 server/main.ts       the page, and the forwarder

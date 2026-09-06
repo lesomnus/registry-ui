@@ -10,6 +10,7 @@ import { connect, connectionOf, type Connection, type RegistryClient } from "./r
 import { Search, type RepoSummary } from "./search";
 import { rawPane } from "./render/blob";
 import { element, shortDigest } from "./render/dom";
+import { fadeEdges } from "./render/fade";
 import { renderImage } from "./render/image";
 import { filterNames, fuzzyRanges, parseQuery, rangesOf, type Mode, type Ranges } from "./match";
 import { pager, type Pager } from "./pager";
@@ -1058,6 +1059,11 @@ document.addEventListener("keydown", (event) => {
 
 el.filter.addEventListener("input", onFilterInput);
 el.tagFilter.addEventListener("input", onTagFilterInput);
+// Every pane that scrolls says so at the edge it is scrolled past.
+for (const pane of [el.repositoryList, el.tagList, el.detail, el.manifest]) {
+  fadeEdges(pane);
+}
+
 markView();
 el.viewList.addEventListener("click", () => setView(false));
 el.viewTree.addEventListener("click", () => setView(true));

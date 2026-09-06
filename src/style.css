@@ -459,6 +459,35 @@ input[type="search"]:focus {
   overflow-y: auto;
 }
 
+/*
+ * Content fading out at whichever edge it carries on past. The two lengths are
+ * set from the scroll position, so the fade grows with it rather than arriving
+ * whole -- see render/fade.ts, which is also where the reasoning lives.
+ *
+ * `mask` rather than a gradient or an overlay: the fade has to be over the
+ * content, and this is the only one of the three that needs no element of its
+ * own in a pane that has nowhere to put one.
+ */
+.faded {
+  --fade-top: 0px;
+  --fade-bottom: 0px;
+
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--fade-top),
+    #000 calc(100% - var(--fade-bottom)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--fade-top),
+    #000 calc(100% - var(--fade-bottom)),
+    transparent 100%
+  );
+}
+
 /* Sized as though every row were there, so the scrollbar tells the truth. */
 .list-sizer {
   position: relative;
