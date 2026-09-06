@@ -39,8 +39,8 @@
    * and this way it does not depend on that.
    */
   --shade-from: var(--bg);
-  --shade-half: color-mix(in srgb, var(--bg) 50%, transparent);
-  --shade-mid: color-mix(in srgb, var(--bg) 18%, transparent);
+  --shade-near: color-mix(in srgb, var(--bg) 62%, transparent);
+  --shade-far: color-mix(in srgb, var(--bg) 26%, transparent);
   --shade-to: color-mix(in srgb, var(--bg) 0%, transparent);
   --scroll-thumb: #c8cfd7;
   --scroll-thumb-hover: #a4aeb9;
@@ -552,23 +552,29 @@ input[type="search"]:focus {
 }
 
 /*
- * The stops in between are not decoration. A straight run from opaque to
- * nothing turns at both ends, and the turn at the far end is a faint line where
- * the shadow stops. These bend it: half gone within a quarter of the first row,
- * most of the way down by the end of it, and then a tail so thin that there is
- * nothing to see the end of when it runs out mid-way through the second.
+ * The stops in between are not decoration, and getting them wrong is what made
+ * this look weak twice.
  *
- *   0%    14%    38%   100%      of a row and a half
- *   0px  ~6px  ~16px   42px
- *   1.0   0.5   0.18      0      of the pane's own colour
+ * They were front-loaded far too hard -- half of it gone within six pixels --
+ * so the shadow reached a row and a half and had no presence anywhere in it.
+ * Reach is not weight. These hold it through the row it is falling on and
+ * spend the second row tailing out:
+ *
+ *   0%    35%    70%   100%      of a row and a half
+ *   0px  ~15px  ~29px   42px
+ *   1.0  0.62   0.26       0     of the pane's own colour
+ *
+ * Which puts the first row under 100% to 29% and the second under 29% to
+ * nothing. Still bent rather than straight, because a straight run turns at
+ * both ends and the far turn is a faint line where the shadow stops.
  */
 .shade-top::after {
   top: 0;
   background: linear-gradient(
     to bottom,
     var(--shade-from) 0%,
-    var(--shade-half) 14%,
-    var(--shade-mid) 38%,
+    var(--shade-near) 35%,
+    var(--shade-far) 70%,
     var(--shade-to) 100%
   );
 }
@@ -578,8 +584,8 @@ input[type="search"]:focus {
   background: linear-gradient(
     to top,
     var(--shade-from) 0%,
-    var(--shade-half) 14%,
-    var(--shade-mid) 38%,
+    var(--shade-near) 35%,
+    var(--shade-far) 70%,
     var(--shade-to) 100%
   );
 }
