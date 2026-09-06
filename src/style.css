@@ -22,6 +22,9 @@
 
   --hover: #eef1f5;
 
+  /* A row. `rowHeight` in render/list.ts is the same number and has to be. */
+  --row: 28px;
+
   /*
    * The pane's own surface, at full opacity and then not.
    *
@@ -36,7 +39,8 @@
    * and this way it does not depend on that.
    */
   --shade-from: var(--bg);
-  --shade-mid: color-mix(in srgb, var(--bg) 35%, transparent);
+  --shade-half: color-mix(in srgb, var(--bg) 50%, transparent);
+  --shade-mid: color-mix(in srgb, var(--bg) 18%, transparent);
   --shade-to: color-mix(in srgb, var(--bg) 0%, transparent);
   --scroll-thumb: #c8cfd7;
   --scroll-thumb-hover: #a4aeb9;
@@ -507,25 +511,44 @@ input[type="search"]:focus {
   position: absolute;
   left: 0;
   right: 0;
-  height: 18px;
+
+  /* A row and a half, so the tail dies out across the middle of the second. */
+  height: calc(var(--row) * 1.5);
   opacity: var(--shade);
   pointer-events: none;
 }
 
 /*
- * The middle stop is not decoration. A straight run from opaque to nothing
- * turns at both ends, and the turn at the far end is a faint line where the
- * shadow stops. Front-loading it -- most of the cover in the first third, a
- * long thin tail after -- leaves nothing to see the end of.
+ * The stops in between are not decoration. A straight run from opaque to
+ * nothing turns at both ends, and the turn at the far end is a faint line where
+ * the shadow stops. These bend it: half gone within a quarter of the first row,
+ * most of the way down by the end of it, and then a tail so thin that there is
+ * nothing to see the end of when it runs out mid-way through the second.
+ *
+ *   0%    14%    38%   100%      of a row and a half
+ *   0px  ~6px  ~16px   42px
+ *   1.0   0.5   0.18      0      of the pane's own colour
  */
 .shade-top::after {
   top: 0;
-  background: linear-gradient(to bottom, var(--shade-from) 0%, var(--shade-mid) 45%, var(--shade-to) 100%);
+  background: linear-gradient(
+    to bottom,
+    var(--shade-from) 0%,
+    var(--shade-half) 14%,
+    var(--shade-mid) 38%,
+    var(--shade-to) 100%
+  );
 }
 
 .shade-bottom::after {
   bottom: 0;
-  background: linear-gradient(to top, var(--shade-from) 0%, var(--shade-mid) 45%, var(--shade-to) 100%);
+  background: linear-gradient(
+    to top,
+    var(--shade-from) 0%,
+    var(--shade-half) 14%,
+    var(--shade-mid) 38%,
+    var(--shade-to) 100%
+  );
 }
 
 /* Sized as though every row were there, so the scrollbar tells the truth. */
@@ -545,7 +568,7 @@ input[type="search"]:focus {
  * They have to agree: the window is positioned by multiplying it.
  */
 .list button {
-  height: 28px;
+  height: var(--row);
 }
 
 .list button {

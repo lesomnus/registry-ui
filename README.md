@@ -540,7 +540,13 @@ flicker.
 
 It is drawn in the pane's own surface colour, opaque where it begins and
 thinning with distance, so there is no edge to notice — only content going under
-something. Two earlier attempts are worth recording because both were wrong in
+something. A row and a half deep, bent so that most of the cover is in the first
+quarter of the first row and the tail runs out mid-way through the second:
+
+````
+px from the edge    0    4    8   14   20   28   34   42
+covered          100%  66%  43%  24%  15%  10%   6%   0%
+``` Two earlier attempts are worth recording because both were wrong in
 instructive ways. A **mask** removes the element's own pixels, so it drew the
 list being cut off by something rather than something lying over it, and no
 depth fixed that: shallow enough not to eat a row it read as an accident, deep
@@ -638,15 +644,19 @@ workaround is gone.
 
 ## Layout
 
+````
+
+src/transport.ts the forwarder as a Transport, and the direct one
+src/registry.ts the client, and the credentials middleware
+src/catalog.ts the repository list, followed to the end
+src/route.ts the address bar, parsed as an image reference
+src/certificate.ts the Fulcio extensions, read out of DER
+src/render/blob.ts the layers, as things to view and to save
+src/render/shade.ts the shadow a scroller casts over what it hides
+src/render/highlight.ts JSON and YAML, coloured without a dependency
+src/render/ dom helpers, the image view, the artifact renderers
+server/main.ts the page, and the forwarder
+
 ```
-src/transport.ts     the forwarder as a Transport, and the direct one
-src/registry.ts      the client, and the credentials middleware
-src/catalog.ts       the repository list, followed to the end
-src/route.ts         the address bar, parsed as an image reference
-src/certificate.ts   the Fulcio extensions, read out of DER
-src/render/blob.ts   the layers, as things to view and to save
-src/render/shade.ts  the shadow a scroller casts over what it hides
-src/render/highlight.ts  JSON and YAML, coloured without a dependency
-src/render/          dom helpers, the image view, the artifact renderers
-server/main.ts       the page, and the forwarder
+
 ```
