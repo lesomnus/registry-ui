@@ -532,6 +532,20 @@ there, so the scrollbar and `Home` and `End` behave.
 `rowHeight` in `src/render/list.ts` and the row height in the stylesheet have to
 agree — the window is positioned by multiplying it.
 
+**The rows stay centred under the filter box.** A scrollbar takes its width out
+of one side, so a row was short on the right by exactly that, which you can see
+on a selected row because its background has edges to compare. `scrollbar-gutter:
+stable both-edges` reserves the same width on the other side, and reserves it
+whether the scrollbar is there or not, so the rows do not shift when a list grows
+past a screenful.
+
+The filter box then has to end up a little wider than those rows, and no number
+in the stylesheet can do that on both a platform with 15px scrollbars and one
+whose scrollbars are overlaid and take no room. So the padding is the rest of a
+constant — the rows are inset 17px whatever the gutter turns out to be, against
+the box's 12 — and `--sb` is measured at startup off a probe with a scrollbar in
+it.
+
 **Every pane that scrolls casts a shadow over the edge it is hiding**, so a list
 with more above it does not look like a list that starts there. It follows the
 scroll rather than switching on: what ramps is the shadow's opacity, over 32px

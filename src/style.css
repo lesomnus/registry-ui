@@ -343,6 +343,7 @@ main {
   flex: 1;
   padding: 4px 12px 16px;
   overflow: auto;
+  scrollbar-gutter: stable;
 }
 
 /* It has the pane; it does not need a box inside it as well. */
@@ -475,11 +476,30 @@ input[type="search"]:focus {
   outline-offset: -1px;
 }
 
+/*
+ * The rows are centred under the filter box, and stay centred.
+ *
+ * A scrollbar takes its width out of one side, so a row was short on the right
+ * by exactly that -- visible on a selected row, whose background has edges to
+ * compare. `both-edges` reserves the same width on the other side, and
+ * `stable` reserves it whether the scrollbar is there or not, so the rows do
+ * not shift when a list grows past a screenful.
+ *
+ * The gutter is the scrollbar's own width, so this is right on a platform whose
+ * scrollbars are 15px and on one whose scrollbars are overlaid and take no
+ * space at all -- neither of which a number written here could have been.
+ *
+ * So the padding is the rest of a constant: the rows are inset 17px whatever
+ * the gutter turns out to be, against the filter box's 12px, and the box is
+ * five pixels wider a side on every platform rather than on one of them.
+ * `--sb` is measured at startup -- see publishScrollbarWidth in render/dom.ts.
+ */
 .list {
   flex: 1;
   margin: 0;
-  padding: 0 8px 12px;
+  padding: 0 max(2px, calc(17px - var(--sb, 0px))) 12px;
   overflow-y: auto;
+  scrollbar-gutter: stable both-edges;
 }
 
 /*
@@ -632,6 +652,10 @@ input[type="search"]:focus {
   flex: 1;
   padding: 4px 20px 24px;
   overflow-y: auto;
+
+  /* Reserved rather than centred: nothing here lines up with anything beside
+     it, but the content still should not jump when the scrollbar appears. */
+  scrollbar-gutter: stable;
 }
 
 /* What the image pane is showing, written as a reference somebody could pull. */
@@ -859,6 +883,7 @@ pre.raw {
   margin: 0;
   padding: 10px 12px;
   overflow: auto;
+  scrollbar-gutter: stable;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg);

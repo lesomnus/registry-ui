@@ -86,3 +86,27 @@ export function shortDigest(digest: string | undefined): string {
   const hex = String(digest ?? "").replace(/^sha256:/, "");
   return hex.length > 12 ? hex.slice(0, 12) : hex;
 }
+
+/**
+ * Publishes the width of a scrollbar as `--sb`, once.
+ *
+ * The lists reserve a scrollbar's width on both edges so their rows stay
+ * centred, and the filter box above them has to end up a little wider than
+ * those rows -- on a platform whose scrollbars are 15px wide and on one whose
+ * scrollbars are overlaid and take no room at all. Those two cannot both be
+ * satisfied by a number written in the stylesheet, so the stylesheet subtracts
+ * this one and the sum comes out the same either way.
+ *
+ * Measured off a probe with a scrollbar rather than off a list: with
+ * `scrollbar-gutter` a list's own missing width is two gutters, and halving it
+ * is a worse way to learn the same number.
+ */
+export function publishScrollbarWidth(): void {
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:absolute;top:-9999px;width:100px;height:100px;overflow-y:scroll";
+  document.body.append(probe);
+  const width = probe.offsetWidth - probe.clientWidth;
+  probe.remove();
+
+  document.documentElement.style.setProperty("--sb", `${width}px`);
+}

@@ -9,7 +9,7 @@ import { tagPage } from "./tags";
 import { connect, connectionOf, type Connection, type RegistryClient } from "./registry";
 import { Search, type RepoSummary } from "./search";
 import { rawPane } from "./render/blob";
-import { element, shortDigest } from "./render/dom";
+import { element, publishScrollbarWidth, shortDigest } from "./render/dom";
 import { shadeEdges } from "./render/shade";
 import { renderImage } from "./render/image";
 import { filterNames, fuzzyRanges, parseQuery, rangesOf, type Mode, type Ranges } from "./match";
@@ -1059,6 +1059,9 @@ document.addEventListener("keydown", (event) => {
 
 el.filter.addEventListener("input", onFilterInput);
 el.tagFilter.addEventListener("input", onTagFilterInput);
+// Before anything is drawn: the lists are laid out against this.
+publishScrollbarWidth();
+
 // Every pane that scrolls says so at the edge it is scrolled past.
 for (const pane of [el.repositoryList, el.tagList, el.detail, el.manifest]) {
   shadeEdges(pane);
