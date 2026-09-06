@@ -213,8 +213,14 @@ does not reverse proxy and
 [is not going to](https://github.com/static-web-server/static-web-server/issues/489),
 so the forwarder is not in it.
 
-**`Dockerfile.forwarder`** is the forwarder, for registries that do not send
-CORS headers.
+**`Dockerfile.server`** is the page _and_ the forwarder, one Go binary on
+distroless — for a registry that sends no CORS headers, where the page cannot
+reach it at all and something has to ask on its behalf. One process on one
+origin, which matters: if SSO sits in front of the page and the forwarder is a
+second deployment on a second port, a process holding a registry credential is
+reachable without going through the SSO.
+
+They are alternatives, not halves. Running both is running two pages.
 
 ### Pointing the page at a registry
 
@@ -320,41 +326,116 @@ blocked, and that is what the locked and branded image in `Dockerfile` is for.
 ## Why there is a server
 
 A registry answers `fetch` from a page only if it sends
-`Access-Control-Allow-Origin`. zot does. Docker Hub and GHCR do not. So
-`server/main.ts` forwards what the page cannot fetch itself.
+`Access-Control-Allow-Origin`. zot does. Docker Hub, ghcr.io and the Worker in
+front of `registry.hday.io` do not — and that last one answers the _preflight_
+with a `401`, which a browser sends without credentials, so no token a person
+could hold would help. For those, the page asks `server/` and it asks the
+registry.
 
-It holds no credentials and has no configuration: whatever the page put in
-`Authorization` is passed along, and nothing is added. Running it grants nobody
-access to anything they did not already have credentials for.
+It is Go, standard library only: `net/http` to serve and forward,
+`crypto/ecdsa` to sign, `net.IP` to judge an address. Nothing to fetch, nothing
+to audit, and a static binary on distroless rather than a language runtime under
+a few static files.
 
-**It is a forwarder, which is a thing to be careful with.** Anything that can
-reach it can ask it to fetch a URL, and "a URL" includes ones only that host can
-reach. What keeps it from being useful for server-side request forgery:
+### Two shapes, and `REGISTRY_UPSTREAM` is the switch
 
-- `GET` and `HEAD` only, so nothing can be changed through it
-- `http` and `https` only
-- private, loopback and link-local addresses are refused
-- responses over `MAX_BODY_BYTES` (8 MiB) are refused before the body is read
+**Without it** the forwarder fetches what it is asked to and holds nothing. The
+page carries whatever credential there is, and running this grants nobody
+anything they could not get by making the request themselves. That is the
+ordinary server-side request forgery question, and the answer is: `GET` and
+`HEAD` only, `http` and `https` only, private and loopback and link-local
+addresses refused unless `ALLOW_PRIVATE_TARGETS`, bodies over `MAX_BODY_BYTES`
+refused. The refusal is by literal address, so a name that _resolves_ to a
+private address is not caught. **Do not put this shape on the public internet.**
 
-The refusal is by literal address, so a hostname that _resolves_ to a private
-address is not caught. **Do not put this on the public internet.**
+**With it** the forwarder is pinned to that one registry, and may hold the
+credential for it. That is not defence in depth, it is the defence: a process
+that holds a credential and takes an arbitrary target is not a process with an
+SSRF problem, it is a process that hands its credential to whoever asks.
 
-| Variable                |                                                            |
-| ----------------------- | ---------------------------------------------------------- |
-| `PORT`                  | Default `8080`.                                            |
-| `ALLOW_PRIVATE_TARGETS` | `true` to reach a registry on your own network or machine. |
-| `MAX_BODY_BYTES`        | Default 8 MiB.                                             |
-| `ALLOWED_ORIGIN`        | Who may call it from a browser. Default `*`.               |
+| Variable            |                                                      |
+| ------------------- | ---------------------------------------------------- |
+| `REGISTRY_UPSTREAM` | e.g. `https://registry.example`. Pins the forwarder. |
+| `REGISTRY_AUTH`     | `none` (default), `basic`, `bearer`, `jwt`           |
+| `ALLOWED_ORIGIN`    | Who may call it from a browser. Default `*`.         |
+| `MAX_BODY_BYTES`    | Default 8 MiB.                                       |
+| `PAGE_ROOT`         | Where the built page is. Default `./dist`.           |
 
-`*` is not the hole it looks like: the forwarder holds no credentials, so
-allowing any page to call it grants that page nothing it could not get by making
-the request itself. It never sends `Access-Control-Allow-Credentials`, so a
-browser will not attach cookies to it either. Naming the page is still tighter.
+| `REGISTRY_AUTH` | Needs                                                                                                                                            |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `basic`         | `REGISTRY_USERNAME`, `REGISTRY_PASSWORD`                                                                                                         |
+| `bearer`        | `REGISTRY_TOKEN`                                                                                                                                 |
+| `jwt`           | `REGISTRY_SIGNING_KEY`, a P-256 private key in JWK form, plus `REGISTRY_TOKEN_ISSUER` / `_SUBJECT` / `_AUDIENCE` / `_CAPABILITIES` / `_LIFETIME` |
+
+Every secret is also read from `<NAME>_FILE`, which is what a mounted secret is.
+A password in the environment is a password in `docker inspect`, in the
+orchestrator's API, and in anything that reads either.
+
+The mode is **named, not inferred** from which secret happens to be set: a
+process holding a key should not be guessing what it was meant to do with it,
+and two secrets set at once is a question rather than a default. Anything it can
+object to it objects to at startup — a missing secret, a key whose public half
+is not the one its private half implies, a credential with no upstream to send
+it to. A pod that will not go ready is better than a viewer that 500s.
+
+### `jwt`, and why a key rather than a token
+
+`registry.hday.io` verifies bearer tokens against a key set deployed with it, and
+will not mint one for a viewer: its only issuance endpoint authenticates the
+caller by mTLS with a TPM-backed device certificate, so a pod with no TPM cannot
+ask. That leaves copying a robot's token into a secret and replacing it by hand
+every week, or holding a signing key and minting as needed.
+
+A key does not expire on its own, which reads like the worse property until you
+ask how each is taken away. A token cannot be revoked — a registry checking
+signatures has no deny list, so a leaked one is good until it expires. A key is
+revoked by dropping its entry from the key set, which takes effect at once and
+touches nothing else in it. And it lets the tokens be short: nothing has to
+survive a restart, so they last five minutes and are re-minted a minute before
+they die, and one that leaks into a log is worth almost nothing by the time
+anybody reads it.
+
+### What the page is told
+
+With `REGISTRY_UPSTREAM` set, `/config.json` is derived rather than configured
+again: the pinned registry _is_ the domain, the forwarder's existence _is_ the
+reason not to talk to the registry directly, and a credential held here _is_ the
+reason not to ask a person for one.
+
+```json
+{ "domain": "registry.example", "forwarder": "/-/fetch", "direct": false, "locked": true, "anonymous": true }
+```
+
+Two variables that have to agree are two variables that can disagree.
+
+### The credential goes to the registry and nowhere else
+
+Three rules, each with a test that fails if it stops being true:
+
+- **The page cannot choose what goes upstream.** Whatever this holds replaces
+  whatever arrived in `Authorization`, or a viewer could spend the credential on
+  requests this did not intend.
+- **It is not carried across a redirect to another host.** Registries answer a
+  blob with a redirect to storage, and the credential is for the registry. Go
+  strips `Authorization` across hosts of its own accord; this does not depend on
+  that.
+- **A pinned forwarder refuses every other host**, before the request is made.
+
+`ALLOWED_ORIGIN` defaults to `*`, which is not the hole it looks like _in the
+shape that holds nothing_ — allowing any page to call it grants that page
+nothing it could not get itself, and it never sends
+`Access-Control-Allow-Credentials`, so a browser will not attach cookies either.
+**In the shape that holds a credential, name the page.** Anyone who can reach it
+can read that registry.
 
 It answers preflights, and it lists what a page may read back in
 `Access-Control-Expose-Headers` — without that a browser hands the page a
 response whose `Docker-Content-Digest` and `Link` read as absent, and nothing
 errors: pages just stop paginating and digests come out as `-`.
+
+**What it cannot do yet** is answer a `Bearer` challenge, so a server-side
+`basic` credential only works against a registry that accepts Basic on `/v2/`
+itself — [#1](https://github.com/lesomnus/registry-ui/issues/1).
 
 ### What is asked for twice, and what is not
 
@@ -696,5 +777,8 @@ src/render/blob.ts        the layers, as things to view and to save
 src/render/highlight.ts   JSON and YAML, coloured without a dependency
 src/render/shade.ts       the shadow a scroller casts over what it hides
 src/render/dom.ts         the handful of shapes the rest is built out of
-server/main.ts            the page, and the forwarder
+server/config.go          what it was told, and what it refuses to start on
+server/credential.go      none, basic, bearer, and a token it signs itself
+server/forward.go         the forward, and who it may be pointed at
+server/main.go            the routes, and the page on disk
 ```

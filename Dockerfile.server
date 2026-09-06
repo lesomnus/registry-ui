@@ -1,0 +1,62 @@
+# The page and the forwarder, in one process on one origin.
+#
+# One origin is not tidiness. If SSO sits in front of the page and the forwarder
+# is a second deployment on a second port, a process holding a registry
+# credential is reachable without going through the SSO.
+#
+# The other image, `Dockerfile`, is the page alone behind static-web-server: no
+# runtime, nothing held, and correct for a registry that sends CORS headers.
+# This one is for a registry that does not, which is the only case where a page
+# cannot ask it anything and something has to ask on its behalf.
+
+FROM node:24-alpine AS page
+WORKDIR /src
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY tsconfig.json vite.config.ts index.html ./
+COPY src ./src
+RUN npm run build
+
+FROM golang:1.25-alpine AS build
+WORKDIR /src
+# No dependencies: everything this needs is in the standard library, so there is
+# nothing to fetch and nothing to audit.
+COPY go.mod ./
+COPY server ./server
+RUN go vet ./server/ && go test ./server/
+# Static, so the runtime image can be one that has no libc to link against.
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/registry-ui ./server
+
+# Static rather than scratch: outbound TLS to the registry needs root
+# certificates, and this is the smallest base that has them and a nonroot uid.
+FROM gcr.io/distroless/static-debian12:nonroot
+WORKDIR /app
+COPY --from=build /out/registry-ui ./registry-ui
+COPY --from=page /src/dist ./dist
+
+ENV PORT=8080 \
+    PAGE_ROOT=/app/dist
+EXPOSE 8080
+USER nonroot:nonroot
+
+# Where it forwards to. Setting it pins the forwarder to that registry and
+# nothing else, which is what makes it safe for this process to hold a
+# credential. Leaving it unset is a forwarder that holds none and will fetch
+# what it is asked to -- see the README before putting that anywhere.
+#   REGISTRY_UPSTREAM   e.g. https://registry.example
+#
+# How it authenticates: none | basic | bearer | jwt. Every secret below is also
+# read from <NAME>_FILE, which is what a mounted secret is.
+#   REGISTRY_AUTH
+#   REGISTRY_USERNAME, REGISTRY_PASSWORD          basic
+#   REGISTRY_TOKEN                                bearer
+#   REGISTRY_SIGNING_KEY                          jwt: a P-256 private JWK
+#   REGISTRY_TOKEN_ISSUER, _SUBJECT, _AUDIENCE, _CAPABILITIES, _LIFETIME
+#
+# With REGISTRY_UPSTREAM set, the page is told what it is looking at and there
+# is nothing else to configure. Without it, the page variables from `Dockerfile`
+# apply here too.
+#   ALLOWED_ORIGIN          who may call the forwarder. Default `*`.
+#   ALLOW_PRIVATE_TARGETS   only meaningful without an upstream.
+#   MAX_BODY_BYTES          default 8 MiB.
+ENTRYPOINT ["/app/registry-ui"]

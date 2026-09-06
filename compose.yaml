@@ -1,28 +1,39 @@
-# The two halves, for a registry that does not send CORS headers.
+# Two shapes, and which one you want depends on one thing: whether the registry
+# sends `Access-Control-Allow-Origin`.
 #
-# With one that does, the forwarder is unnecessary: run `page` alone and tick
-# "direct" in the UI.
+#   it does      -- `page` alone, ticked "direct". Nothing is held, nothing is
+#                   proxied, and the image has no runtime in it.
+#   it does not  -- `served` alone. The page cannot reach the registry at all,
+#                   so this asks on its behalf and holds the credential.
+#
+# They are alternatives. Running both is running two pages.
 services:
+  # The page, behind static-web-server. See Dockerfile.
   page:
+    profiles: ["direct"]
     build: .
     ports: ["8080:8080"]
     environment:
-      # What the form starts filled in with. The page opens it by itself when a
-      # domain is set. A person can type another one, and that sticks in their
-      # browser -- which also means changing this does not move somebody who
-      # already has.
-      REGISTRY_DOMAIN: ""
-      REGISTRY_FORWARDER: "http://localhost:8081/-/fetch"
+      REGISTRY_DOMAIN: "registry.example"
+      REGISTRY_LOCKED: "true"
 
-  forwarder:
+  # The page and the forwarder, one process. See Dockerfile.server.
+  served:
+    profiles: ["forwarded"]
     build:
       context: .
-      dockerfile: Dockerfile.forwarder
-    ports: ["8081:8080"]
+      dockerfile: Dockerfile.server
+    ports: ["8080:8080"]
     environment:
-      # The page is a different origin here, so the forwarder has to allow it.
-      # `*` is the default and is safe for what this is -- it holds no
-      # credentials and never allows cookies -- but naming the page is tighter.
+      # Pins the forwarder to this registry, which is what makes it safe for
+      # this process to hold a credential for it.
+      REGISTRY_UPSTREAM: "https://registry.example"
+
+      # none | basic | bearer | jwt
+      REGISTRY_AUTH: "bearer"
+      REGISTRY_TOKEN: "" # or REGISTRY_TOKEN_FILE, which is what a secret is
+
+      # The page is told what it is looking at, so there is nothing else here.
+      # Whoever can reach this can read that registry: put it behind whatever
+      # decides who that is.
       ALLOWED_ORIGIN: "http://localhost:8080"
-      # Uncomment to browse a registry on this machine or network.
-      # ALLOW_PRIVATE_TARGETS: "true"
