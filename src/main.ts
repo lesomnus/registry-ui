@@ -38,7 +38,8 @@ const el = {
   repositoryCount: document.getElementById("repository-count") as HTMLElement,
   filter: document.getElementById("repository-filter") as HTMLInputElement,
   tagFilter: document.getElementById("tag-filter") as HTMLInputElement,
-  view: document.getElementById("view-toggle") as HTMLButtonElement,
+  viewList: document.getElementById("view-list") as HTMLButtonElement,
+  viewTree: document.getElementById("view-tree") as HTMLButtonElement,
   tagList: document.getElementById("tag-list") as HTMLElement,
   tagCount: document.getElementById("tag-count") as HTMLElement,
   detail: document.getElementById("detail") as HTMLElement,
@@ -383,12 +384,18 @@ function renderRepositories(): void {
   );
 }
 
+/** Lights the one you are in. The only place either button's state is set. */
+function markView(): void {
+  el.viewTree.setAttribute("aria-pressed", String(state.tree));
+  el.viewList.setAttribute("aria-pressed", String(!state.tree));
+}
+
 /**
- * Switches between the flat list and the tree, keeping the eye where it was.
+ * Shows the flat list or the tree, keeping the eye where it was.
  *
- * The two views are the same names in a different arrangement, so a switch that
+ * The two views are the same names in a different arrangement, so a change that
  * jumps to the top makes somebody find their place again -- which is most of
- * the reason not to switch. So the row at the top of the viewport is noted, the
+ * the reason not to change. So the row at the top of the viewport is noted, the
  * view is rebuilt, and that row is put back under the same pixel.
  *
  * Going to the tree, the row is a repository whose groups may be closed: they
@@ -396,11 +403,14 @@ function renderRepositories(): void {
  * the row may be a group, which is not in the list at all -- the first
  * repository under it stands in, being the thing that was about to be read.
  */
-function toggleView(): void {
+function setView(tree: boolean): void {
+  if (tree === state.tree) {
+    return;
+  }
+
   const before = listAnchor(el.repositoryList);
-  state.tree = !state.tree;
-  el.view.textContent = state.tree ? "list" : "tree";
-  el.view.setAttribute("aria-pressed", String(state.tree));
+  state.tree = tree;
+  markView();
 
   let target = before;
   if (before !== undefined) {
@@ -1048,9 +1058,9 @@ document.addEventListener("keydown", (event) => {
 
 el.filter.addEventListener("input", onFilterInput);
 el.tagFilter.addEventListener("input", onTagFilterInput);
-el.view.textContent = state.tree ? "list" : "tree";
-el.view.setAttribute("aria-pressed", String(state.tree));
-el.view.addEventListener("click", toggleView);
+markView();
+el.viewList.addEventListener("click", () => setView(false));
+el.viewTree.addEventListener("click", () => setView(true));
 el.reset.addEventListener("click", forget);
 
 window.addEventListener("popstate", () => void refresh());

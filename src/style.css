@@ -363,6 +363,63 @@ h2 {
   color: var(--text-muted);
 }
 
+/*
+ * A segmented switch: two choices, the one you are in lit.
+ *
+ * It replaced a single button whose label said what the *next* click would do,
+ * which is a thing you have to work out rather than read. Both options are
+ * here, so there is nothing to work out.
+ */
+.switch {
+  display: inline-flex;
+  flex: none;
+  gap: 1px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-sunken);
+}
+
+.switch button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.switch button:hover {
+  color: var(--text);
+}
+
+.switch button[aria-pressed="true"] {
+  background: var(--bg-raised);
+  color: var(--accent);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+}
+
+/* The row icons are dimmed to sit behind their label; these are the control. */
+.switch .icon {
+  margin: 0;
+  opacity: 1;
+}
+
+/* Named for a screen reader, drawn as the icon for everyone else. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .toggle {
   padding: 2px 8px;
   border: 1px solid var(--border-strong);

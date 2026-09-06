@@ -60,8 +60,32 @@
         <div class="pane-head">
           <h2>Repositories</h2>
           <span class="count" id="repository-count"></span>
-          <!-- Label and pressed state are set from the state it toggles. -->
-          <button id="view-toggle" class="toggle" type="button" title="Group by prefix, or list every name"></button>
+          <!--
+            A switch rather than a toggle: both views are on screen and the one
+            you are in is the one lit. The single button said "list" while
+            showing the tree, which is a label that has to be read as a promise
+            about the next click rather than as a description of this one.
+
+            `aria-pressed` on each is set from the state, in one place.
+          -->
+          <div class="switch" role="group" aria-label="Repository view">
+            <button id="view-list" type="button" title="Every name, in a flat list">
+              <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
+                <path
+                  d="M2 3.4h2.2v1.6H2zM5.9 3.4H14v1.6H5.9zM2 7.2h2.2v1.6H2zM5.9 7.2H14v1.6H5.9zM2 11h2.2v1.6H2zM5.9 11H14v1.6H5.9z"
+                />
+              </svg>
+              <span class="sr-only">List</span>
+            </button>
+            <button id="view-tree" type="button" title="Grouped by the prefixes the names share">
+              <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
+                <path
+                  d="M2 2h12v1.6H2zM2.6 4.2h1.3v8.2H2.6zM3.9 6.5h2.4v1.4H3.9zM7 6.4h7V8H7zM3.9 10.8h2.4v1.4H3.9zM7 10.7h7v1.6H7z"
+                />
+              </svg>
+              <span class="sr-only">Tree</span>
+            </button>
+          </div>
         </div>
         <input
           id="repository-filter"

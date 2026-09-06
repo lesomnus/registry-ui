@@ -408,9 +408,15 @@ Repository names are paths — `dist/hday/kamino`, `dist/hday/lens` — and a fl
 list of a few hundred of them hides what the shared prefixes mean. The tree
 draws them once, and is what you land on: two hundred names flat is a list you
 scroll looking for a prefix you already know, and the same names as thirty
-groups is one you read. **list** is a click away. A run of single-child groups
-is folded into one row, so `dist/external/docker.io/library` is one line rather
-than four clicks.
+groups is one you read.
+
+The control beside the count is a switch rather than a toggle: both views are
+drawn on it and the one you are in is the one lit. It used to be a single button
+whose label said `list` while it was showing the tree — a label you have to read
+as a promise about the next click rather than as a description of this one.
+
+A run of single-child groups is folded into one row, so
+`dist/external/docker.io/library` is one line rather than four clicks.
 
 A repository named in the address is revealed rather than merely selected — the
 groups above it are opened and the list scrolls to it, unless it was already on
