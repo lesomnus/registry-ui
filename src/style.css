@@ -472,19 +472,29 @@ input[type="search"]:focus {
   --fade-top: 0px;
   --fade-bottom: 0px;
 
+  /*
+   * What is *left* of the content at the very edge, not what is taken.
+   *
+   * It used to reach zero, and the ramp is a row tall, so the row you were
+   * scrolling past vanished -- which says "the list starts here", the opposite
+   * of what a fade is for. Something has to survive the fade or there is
+   * nothing to be told about.
+   */
+  --fade-min: 0.42;
+
   -webkit-mask-image: linear-gradient(
     to bottom,
-    transparent 0,
+    rgb(0 0 0 / var(--fade-min)) 0,
     #000 var(--fade-top),
     #000 calc(100% - var(--fade-bottom)),
-    transparent 100%
+    rgb(0 0 0 / var(--fade-min)) 100%
   );
   mask-image: linear-gradient(
     to bottom,
-    transparent 0,
+    rgb(0 0 0 / var(--fade-min)) 0,
     #000 var(--fade-top),
     #000 calc(100% - var(--fade-bottom)),
-    transparent 100%
+    rgb(0 0 0 / var(--fade-min)) 100%
   );
 }
 

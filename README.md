@@ -535,8 +535,18 @@ agree — the window is positioned by multiplying it.
 **Every pane that scrolls fades at the edge it is scrolled past**, in the pane's
 own colour, so a list with more above it does not look like a list that starts
 there. It follows the scroll rather than switching on: one pixel in is one pixel
-of fade, reaching full depth over 28. A fade that arrives whole the moment you
-touch the wheel is a flicker.
+of fade, reaching its full depth over 28. A fade that arrives whole the moment
+you touch the wheel is a flicker.
+
+**It never reaches nothing.** The ramp is a row tall, so a fade that went all
+the way took the whole row you were scrolling past — and a row that is gone says
+the list starts there, which is the opposite of the point. It stops at 58%, so
+the row is receding rather than absent:
+
+```
+distance from the edge    0px   4px   8px  14px  28px
+content still shown       42%   50%   59%   71%  100%
+```
 
 It is a `mask`, which is neither of the two obvious things. The fade has to be
 _over_ the content — the point is that the content disappears into the

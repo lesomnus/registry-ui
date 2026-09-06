@@ -12,6 +12,13 @@
  * that appears whole the instant you touch the wheel is a flicker; one that
  * grows is the same information without the flinch.
  *
+ * **It never reaches nothing.** `--fade-min` in the stylesheet is what is left
+ * of the content at the very edge, and it is deliberately not zero: the ramp is
+ * about a row tall, so a fade that went all the way took the whole row you were
+ * scrolling past. A row that is gone says the list starts there, which is the
+ * opposite of the point. Something has to survive it to be the thing you are
+ * being told about.
+ *
  * # Why a mask
  *
  * The fade has to be *over* the content -- the point is that the content
@@ -23,7 +30,13 @@
  * behind it shows through, and it costs two custom properties and no markup.
  */
 
-/** How far you scroll before the fade is at full depth. */
+/**
+ * How far you scroll before the fade is as deep as it gets.
+ *
+ * A row is 28px, so in the lists this is the row being scrolled past and no
+ * more: exactly the one that is half gone is the one half faded. The panes that
+ * are not lists have no rows and the same distance reads the same.
+ */
 const ramp = 28;
 
 const clamp = (value: number): number => Math.max(0, Math.min(ramp, value));
