@@ -538,15 +538,19 @@ scroll rather than switching on: what ramps is the shadow's opacity, over 32px
 of scroll. A shadow that arrives whole the moment you touch the wheel is a
 flicker.
 
-This was a fade first — the content masked out into the pane's own colour — and
-it read wrong. A mask _removes_ content, so what you saw was the list being cut
-off by something rather than something lying over it. Shallow enough not to eat
-a row it read as an accident, and deep enough to read as deliberate it ate the
-row it was supposed to be telling you about.
+It is drawn in the pane's own surface colour, opaque where it begins and
+thinning with distance, so there is no edge to notice — only content going under
+something. Two earlier attempts are worth recording because both were wrong in
+instructive ways. A **mask** removes the element's own pixels, so it drew the
+list being cut off by something rather than something lying over it, and no
+depth fixed that: shallow enough not to eat a row it read as an accident, deep
+enough to read as deliberate it ate the row it was meant to be about. A **dark
+gradient** — what "shadow" usually means — was worse in a different way, since a
+colour the pane has nowhere else reads as a band laid across it.
 
 A shadow needs a thing to fall from. At the top that is whatever sits above the
 scroller — the filter box, the pane heading — which is why there is no gap under
-the filter box: the shadow starts at its edge and runs down over the rows.
+the filter box: the surface starts at its edge and runs down over the rows.
 
 It is placed without measuring anything. Two elements of zero height, one either
 side of the scroller in the pane's flex column: being in the flow they are

@@ -4,16 +4,25 @@
  * A pane that is scrolled has content above the top of it, and nothing on
  * screen said so: the first visible row looked exactly like the first row.
  *
- * This was a mask first -- the content faded out into the pane's own colour --
- * and it read wrong. A mask *removes* content, so what you saw was the list
- * being cut off by something, not something lying over it. Shallow enough not
- * to eat a row, it read as an accident; deep enough to read as deliberate, it
- * ate the row it was supposed to be telling you about.
+ * It took three goes to get right, and the two failures are worth keeping.
  *
- * So it is a shadow now, and a shadow needs a thing to fall from. At the top
- * that is whatever sits above the scroller -- the filter box, the pane heading
- * -- which is why the gap under the filter box is gone: the shadow starts at
- * its edge and runs down over the rows. At the bottom it is the pane's own end.
+ * It was a mask first: the element faded out its own pixels. A mask *removes*
+ * content, so what it drew was the list being cut off by something rather than
+ * something lying over it, and there was no depth that fixed that -- shallow
+ * enough not to eat a row it read as an accident, deep enough to read as
+ * deliberate it ate the row it was meant to be telling you about.
+ *
+ * Then it was a dark gradient, which is what "shadow" usually means, and that
+ * was worse in a different way: a colour the pane does not have anywhere else
+ * reads as a band laid across it. A strip, not a shadow.
+ *
+ * What it is now is the pane's own surface, opaque where it begins and thinning
+ * with distance -- so there is no edge to notice, only content going under
+ * something. A shadow needs a thing to fall from, and at the top that is
+ * whatever sits above the scroller: the filter box, the pane heading. Which is
+ * why the gap under the filter box is gone -- the surface has to start at its
+ * edge or there is a strip of pane between the two that nothing crosses. At the
+ * bottom it is the pane's own end.
  *
  * # How it is placed without measuring anything
  *
@@ -23,10 +32,10 @@
  * they span its full width. Each paints its shadow out of that line with an
  * absolutely positioned `::after` that takes up no room.
  *
- * **It follows the scroll rather than switching on.** What ramps is the
- * shadow's opacity, not its size: a light that does not move and an edge that
- * occludes more of what is under it. A shadow that arrives whole the instant
- * you touch the wheel is a flicker.
+ * **It follows the scroll rather than switching on.** What ramps is the whole
+ * thing's opacity, not its size: an edge covering more of what is under it
+ * rather than reaching further. A shadow that arrives whole the instant you
+ * touch the wheel is a flicker.
  */
 
 /** How far you scroll before the shadow is at full strength. */

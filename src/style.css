@@ -21,7 +21,23 @@
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 
   --hover: #eef1f5;
-  --shade-color: rgb(15 20 26 / 20%);
+
+  /*
+   * The pane's own surface, at full opacity and then not.
+   *
+   * `--bg` itself, thinned -- which is the point: where the shadow begins it is
+   * the background exactly, so there is nothing there to see the edge of. Mixed
+   * from it rather than written out, so that changing `--bg` cannot leave a
+   * shadow behind in the old colour, and so there is one of these rather than
+   * one per theme.
+   *
+   * The last stop keeps the same RGB instead of the bare `transparent` keyword:
+   * gradients interpolate premultiplied, where that would make no difference,
+   * and this way it does not depend on that.
+   */
+  --shade-from: var(--bg);
+  --shade-mid: color-mix(in srgb, var(--bg) 35%, transparent);
+  --shade-to: color-mix(in srgb, var(--bg) 0%, transparent);
   --scroll-thumb: #c8cfd7;
   --scroll-thumb-hover: #a4aeb9;
 
@@ -46,7 +62,6 @@
     --warn: #d9a441;
 
     --hover: #1d242c;
-    --shade-color: rgb(0 0 0 / 55%);
     --scroll-thumb: #39424d;
     --scroll-thumb-hover: #55616f;
 
@@ -492,19 +507,25 @@ input[type="search"]:focus {
   position: absolute;
   left: 0;
   right: 0;
-  height: 14px;
+  height: 18px;
   opacity: var(--shade);
   pointer-events: none;
 }
 
+/*
+ * The middle stop is not decoration. A straight run from opaque to nothing
+ * turns at both ends, and the turn at the far end is a faint line where the
+ * shadow stops. Front-loading it -- most of the cover in the first third, a
+ * long thin tail after -- leaves nothing to see the end of.
+ */
 .shade-top::after {
   top: 0;
-  background: linear-gradient(to bottom, var(--shade-color), transparent);
+  background: linear-gradient(to bottom, var(--shade-from) 0%, var(--shade-mid) 45%, var(--shade-to) 100%);
 }
 
 .shade-bottom::after {
   bottom: 0;
-  background: linear-gradient(to top, var(--shade-color), transparent);
+  background: linear-gradient(to top, var(--shade-from) 0%, var(--shade-mid) 45%, var(--shade-to) 100%);
 }
 
 /* Sized as though every row were there, so the scrollbar tells the truth. */
