@@ -204,6 +204,26 @@ and costs neither.
 
 ## Containers
 
+```bash
+docker pull ghcr.io/lesomnus/registry-ui          # the page
+docker pull ghcr.io/lesomnus/registry-ui/server   # the page and the forwarder
+```
+
+Both are `linux/amd64` and `linux/arm64`, built and pushed from `main` by
+[`.github/workflows/images.yaml`](.github/workflows/images.yaml) through
+[`docker-bake.hcl`](docker-bake.hcl). A pull request builds both, on both
+platforms, and publishes neither.
+
+Four tags per build, each answering a different question: `:edge` is what was
+last pushed from `main`, `:r<run>` is which build it was, `:YYMMDD` is the last
+build of that day, and `:YYMMDD-r<run>` is the only one of the four that never
+moves — which is what a deployment meant to stay put pins.
+
+There is no test job, because there is nothing for one to do that the build does
+not: `Dockerfile.server` runs `go vet` and `go test` in its build stage, and both
+images run `tsc --noEmit` through `npm run build`. What is published has been
+checked by having been built.
+
 Two images, because they are two different things.
 
 **`Dockerfile`** builds the page and serves it with

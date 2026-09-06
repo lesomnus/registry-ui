@@ -1,0 +1,91 @@
+name: images
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: &paths
+      - .github/workflows/images.yaml
+      - docker-bake.hcl
+      - Dockerfile
+      - Dockerfile.server
+      - go.mod
+      - server/**
+      - src/**
+      - index.html
+      - package.json
+      - package-lock.json
+      - tsconfig.json
+      - vite.config.ts
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths: *paths
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write # to push to ghcr.io/lesomnus/registry-ui
+
+    env:
+      TAG: edge
+      BUILD_HASH: ${{ github.sha }}
+      BUILD_ID: r${{ github.run_id }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      # Only from main. What is in the registry is what is deployable, and a
+      # branch that has not been merged is not that. A pull request still
+      # builds -- both images, both platforms -- it just does not publish, so a
+      # change that breaks the build or the tests fails here rather than after
+      # it lands.
+      - uses: docker/login-action@v3
+        if: github.event_name == 'push'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The tests are not a step of their own because they are not a step of
+      # their own: `Dockerfile.server` runs `go vet` and `go test` in its build
+      # stage, and both images run `tsc --noEmit` through `npm run build`. What
+      # is published has been checked by having been built.
+      - name: Build
+        id: build
+        uses: docker/bake-action@v6
+        with:
+          files: docker-bake.hcl
+          targets: page,server
+          push: ${{ github.event_name == 'push' }}
+          # A scope per target. Sharing one has the two images evicting each
+          # other's layers, which reads as a cache that is simply never warm --
+          # they have a node stage in common and nothing else.
+          set: |
+            page.cache-from=type=gha,scope=page
+            page.cache-to=type=gha,scope=page,mode=max
+            server.cache-from=type=gha,scope=server
+            server.cache-to=type=gha,scope=server,mode=max
+
+      # What was pushed, said once, rather than left for somebody to ask the
+      # registry what a moving tag points at now.
+      - name: Summarise
+        if: github.event_name == 'push'
+        env:
+          METADATA: ${{ steps.build.outputs.metadata }}
+        run: |
+          set -eu
+          {
+            echo "| image | digest |"
+            echo "| ----- | ------ |"
+            printf '%s' "$METADATA" | jq -r '
+              to_entries[]
+              | select(.value["image.name"])
+              | "| \(.value["image.name"] | split(",")[0]) | `\(.value["containerimage.digest"])` |"
+            '
+          } >> "$GITHUB_STEP_SUMMARY"
