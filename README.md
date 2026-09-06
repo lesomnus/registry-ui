@@ -532,6 +532,13 @@ there, so the scrollbar and `Home` and `End` behave.
 `rowHeight` in `src/render/list.ts` and the row height in the stylesheet have to
 agree — the window is positioned by multiplying it.
 
+**Every pane heading is the same height**, so what is under it starts on the
+same line in all four. It used to be padding around whatever was in it, and the
+repositories heading has the view switch in it — 26px against 17px of text — so
+its filter box sat nine pixels below the one beside it. A heading as tall as its
+contents is a heading whose height is decided by the last thing anybody put in
+one.
+
 **The rows stay centred under the filter box.** A scrollbar takes its width out
 of one side, so a row was short on the right by exactly that, which you can see
 on a selected row because its background has edges to compare. `scrollbar-gutter:

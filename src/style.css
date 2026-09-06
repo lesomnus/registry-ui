@@ -362,12 +362,25 @@ main {
   overflow: hidden;
 }
 
+/*
+ * The same height in every pane, so what is under it starts at the same line.
+ *
+ * It used to be padding around whatever was in it, and the repositories head
+ * has a switch in it -- 26px against 17px of text -- so its filter box sat nine
+ * pixels below the one beside it. A head that is as tall as its contents is a
+ * head whose height is decided by the last thing anybody put in one.
+ *
+ * 40px leaves seven pixels around the switch, which is the tallest thing here,
+ * and it is also what the registry in the corner sits inside.
+ */
 .pane-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
+  flex: none;
   gap: 8px;
-  padding: 12px 16px 8px;
+  height: 40px;
+  padding: 0 16px;
 }
 
 h2 {
