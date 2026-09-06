@@ -532,30 +532,30 @@ there, so the scrollbar and `Home` and `End` behave.
 `rowHeight` in `src/render/list.ts` and the row height in the stylesheet have to
 agree — the window is positioned by multiplying it.
 
-**Every pane that scrolls fades at the edge it is scrolled past**, in the pane's
-own colour, so a list with more above it does not look like a list that starts
-there. It follows the scroll rather than switching on: one pixel in is one pixel
-of fade, reaching its full depth over 28. A fade that arrives whole the moment
-you touch the wheel is a flicker.
+**Every pane that scrolls casts a shadow over the edge it is hiding**, so a list
+with more above it does not look like a list that starts there. It follows the
+scroll rather than switching on: what ramps is the shadow's opacity, over 32px
+of scroll. A shadow that arrives whole the moment you touch the wheel is a
+flicker.
 
-**It never reaches nothing.** The ramp is a row tall, so a fade that went all
-the way took the whole row you were scrolling past — and a row that is gone says
-the list starts there, which is the opposite of the point. It stops at 58%, so
-the row is receding rather than absent:
+This was a fade first — the content masked out into the pane's own colour — and
+it read wrong. A mask _removes_ content, so what you saw was the list being cut
+off by something rather than something lying over it. Shallow enough not to eat
+a row it read as an accident, and deep enough to read as deliberate it ate the
+row it was supposed to be telling you about.
 
-```
-distance from the edge    0px   4px   8px  14px  28px
-content still shown       42%   50%   59%   71%  100%
-```
+A shadow needs a thing to fall from. At the top that is whatever sits above the
+scroller — the filter box, the pane heading — which is why there is no gap under
+the filter box: the shadow starts at its edge and runs down over the rows.
 
-It is a `mask`, which is neither of the two obvious things. The fade has to be
-_over_ the content — the point is that the content disappears into the
-background — so a background gradient is behind everything and wrong, and an
-overlay needs somewhere to live in a pane that has nowhere to put one. A mask is
-two custom properties and no markup, and what sets them is watched rather than
-reported: a scroll, a `ResizeObserver` for the pane changing size, and a
-`MutationObserver` for the list growing a page, so nothing has to remember to
-call it after a render.
+It is placed without measuring anything. Two elements of zero height, one either
+side of the scroller in the pane's flex column: being in the flow they are
+already exactly where the scroller begins and ends, whatever is above it in that
+particular pane, and they span its full width. What sets their opacity is
+watched rather than reported — a scroll, a `ResizeObserver` for the pane
+changing size, and a `MutationObserver` for the list growing a page, which is a
+height on a child and not something the scroller would hear about. So nothing
+has to remember to call it after a render.
 
 ## How it talks to a registry
 
@@ -641,7 +641,7 @@ src/catalog.ts       the repository list, followed to the end
 src/route.ts         the address bar, parsed as an image reference
 src/certificate.ts   the Fulcio extensions, read out of DER
 src/render/blob.ts   the layers, as things to view and to save
-src/render/fade.ts   the edge a scroll is hiding, faded into the pane
+src/render/shade.ts  the shadow a scroller casts over what it hides
 src/render/highlight.ts  JSON and YAML, coloured without a dependency
 src/render/          dom helpers, the image view, the artifact renderers
 server/main.ts       the page, and the forwarder

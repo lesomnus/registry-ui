@@ -3,7 +3,6 @@ import { extensionFor, isJson, isTextual } from "../media-types";
 import type { RegistryClient } from "../registry";
 import type { Cell } from "./dom";
 import { element, formatSize, shortDigest, table } from "./dom";
-import { fadeEdges } from "./fade";
 import { highlight } from "./highlight";
 
 /** A layer, as every manifest shape here describes one. */
@@ -73,12 +72,6 @@ export function rawPane(text: string, mediaType: string | undefined, note?: stri
 
   const pre = element("pre", "raw");
   pre.append(nodes);
-
-  // It scrolls wherever it is capped -- under the image, and in an opened
-  // layer. In the manifest pane the pane scrolls instead and this is a mask
-  // that never opens, which costs nothing and needs no special case.
-  fadeEdges(pre);
-
   fragment.append(pre);
   return fragment;
 }

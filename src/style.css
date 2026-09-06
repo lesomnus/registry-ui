@@ -21,6 +21,7 @@
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 
   --hover: #eef1f5;
+  --shade-color: rgb(15 20 26 / 20%);
   --scroll-thumb: #c8cfd7;
   --scroll-thumb-hover: #a4aeb9;
 
@@ -45,6 +46,7 @@
     --warn: #d9a441;
 
     --hover: #1d242c;
+    --shade-color: rgb(0 0 0 / 55%);
     --scroll-thumb: #39424d;
     --scroll-thumb-hover: #55616f;
 
@@ -437,7 +439,9 @@ h2 {
 }
 
 input[type="search"] {
-  margin: 0 12px 8px;
+  /* No gap below it: the shadow over the list starts at this edge, and a gap is
+     a strip of pane between the two that nothing is falling across. */
+  margin: 0 12px 0;
   padding: 6px 10px;
   border: 1px solid var(--border-strong);
   border-radius: 6px;
@@ -468,34 +472,39 @@ input[type="search"]:focus {
  * content, and this is the only one of the three that needs no element of its
  * own in a pane that has nowhere to put one.
  */
-.faded {
-  --fade-top: 0px;
-  --fade-bottom: 0px;
+/*
+ * The shadow the scroller casts over what it is hiding. See render/shade.ts.
+ *
+ * Zero height, in the pane's column, so it sits exactly where the scroller
+ * begins and ends without anything measuring where that is. The shadow itself
+ * is an absolutely positioned `::after`, which takes up no room either.
+ */
+.shade {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  height: 0;
+  --shade: 0;
+}
 
-  /*
-   * What is *left* of the content at the very edge, not what is taken.
-   *
-   * It used to reach zero, and the ramp is a row tall, so the row you were
-   * scrolling past vanished -- which says "the list starts here", the opposite
-   * of what a fade is for. Something has to survive the fade or there is
-   * nothing to be told about.
-   */
-  --fade-min: 0.42;
+.shade::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 14px;
+  opacity: var(--shade);
+  pointer-events: none;
+}
 
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    rgb(0 0 0 / var(--fade-min)) 0,
-    #000 var(--fade-top),
-    #000 calc(100% - var(--fade-bottom)),
-    rgb(0 0 0 / var(--fade-min)) 100%
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    rgb(0 0 0 / var(--fade-min)) 0,
-    #000 var(--fade-top),
-    #000 calc(100% - var(--fade-bottom)),
-    rgb(0 0 0 / var(--fade-min)) 100%
-  );
+.shade-top::after {
+  top: 0;
+  background: linear-gradient(to bottom, var(--shade-color), transparent);
+}
+
+.shade-bottom::after {
+  bottom: 0;
+  background: linear-gradient(to top, var(--shade-color), transparent);
 }
 
 /* Sized as though every row were there, so the scrollbar tells the truth. */
