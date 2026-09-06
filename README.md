@@ -561,19 +561,24 @@ flicker.
 
 It is drawn in the pane's own surface colour, opaque where it begins and
 thinning with distance, so there is no edge to notice — only content going under
-something. A row and a half deep, bent so that most of the cover is in the first
-quarter of the first row and the tail runs out mid-way through the second:
+something. A row and a half deep, held through the row it is falling on and
+tailing out across the second:
 
-````
-px from the edge    0    4    8   14   20   28   34   42
-covered          100%  66%  43%  24%  15%  10%   6%   0%
-``` Two earlier attempts are worth recording because both were wrong in
-instructive ways. A **mask** removes the element's own pixels, so it drew the
-list being cut off by something rather than something lying over it, and no
-depth fixed that: shallow enough not to eat a row it read as an accident, deep
-enough to read as deliberate it ate the row it was meant to be about. A **dark
-gradient** — what "shadow" usually means — was worse in a different way, since a
-colour the pane has nowhere else reads as a band laid across it.
+```
+px from the edge    0    4    8   14   21   28   35   42
+covered          100%  90%  79%  64%  47%  29%  14%   0%
+                     |-------- row 1 --------|-- row 2 --|
+```
+
+Three attempts, and the two wrong ones are worth recording. A **mask** removes
+the element's own pixels, so it drew the list being cut off by something rather
+than something lying over it, and no depth fixed that: shallow enough not to eat
+a row it read as an accident, deep enough to read as deliberate it ate the row
+it was meant to be about. A **dark gradient** — what "shadow" usually means —
+was worse in a different way, since a colour the pane has nowhere else reads as
+a band laid across it. And the first curve of this one confused reach with
+weight: a row and a half long, with half of it spent in the first six pixels, so
+it arrived nowhere and looked like nothing.
 
 A shadow needs a thing to fall from. At the top that is whatever sits above the
 scroller — the filter box, the pane heading — which is why there is no gap under
@@ -665,19 +670,24 @@ workaround is gone.
 
 ## Layout
 
-````
-
-src/transport.ts the forwarder as a Transport, and the direct one
-src/registry.ts the client, and the credentials middleware
-src/catalog.ts the repository list, followed to the end
-src/route.ts the address bar, parsed as an image reference
-src/certificate.ts the Fulcio extensions, read out of DER
-src/render/blob.ts the layers, as things to view and to save
-src/render/shade.ts the shadow a scroller casts over what it hides
-src/render/highlight.ts JSON and YAML, coloured without a dependency
-src/render/ dom helpers, the image view, the artifact renderers
-server/main.ts the page, and the forwarder
-
 ```
-
+src/transport.ts          the forwarder as a Transport, and the direct one
+src/registry.ts           the client, and what Accept each mode sends
+src/catalog.ts            one page of the repository list, and the cursor
+src/tags.ts               one page of a repository's tags
+src/pager.ts              the rest of the pages, when they are wanted
+src/route.ts              the address bar, parsed as an image reference
+src/match.ts              substring, regex and fuzzy, picked by what was typed
+src/manifest.ts           every manifest read, and the digest over its bytes
+src/cache.ts              what is remembered, because a digest cannot change
+src/certificate.ts        the Fulcio extensions, read out of DER
+src/render/list.ts        the windowed list, and where it is scrolled to
+src/render/tree.ts        the names as paths, folded and flattened
+src/render/image.ts       the image view: platforms, layers, what is attached
+src/render/artifact.ts    a renderer per artifact type, and the fallback
+src/render/blob.ts        the layers, as things to view and to save
+src/render/highlight.ts   JSON and YAML, coloured without a dependency
+src/render/shade.ts       the shadow a scroller casts over what it hides
+src/render/dom.ts         the handful of shapes the rest is built out of
+server/main.ts            the page, and the forwarder
 ```
