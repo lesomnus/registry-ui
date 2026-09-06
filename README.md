@@ -129,6 +129,13 @@ not list, get the corner.
 size that suits what is in them — a repository name, a tag, and a definition
 list are all things with a length — and the manifest takes whatever is left.
 
+In that pane the manifest is not a box: the pane is the box, so the `pre` is
+stripped of its border and its scrolling and the pane does both axes. Left as a
+scroller it was sized to its own content, which put its horizontal scrollbar at
+the end of the text rather than at the bottom of the pane — a scrollbar across
+the middle of it, for a short manifest with one long line — and meant the view
+was as tall as the JSON instead of as tall as the pane.
+
 That last pane is what the width was going to. The manifest was already at the
 bottom of the image behind a toggle, which is the right content in the wrong
 place: it is what you check the rendered view _against_, so it wants to be

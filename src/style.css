@@ -346,11 +346,24 @@ main {
   scrollbar-gutter: stable;
 }
 
-/* It has the pane; it does not need a box inside it as well. */
+/*
+ * It has the pane; it does not need a box inside it as well -- and it must not
+ * be a scroller inside one either.
+ *
+ * The base rule makes a `pre` its own scroller, which is right where it is a
+ * bordered box under an image and wrong here: sized to its content, its
+ * horizontal scrollbar sits at the end of the text rather than at the bottom of
+ * the pane, which for a short manifest with one long line is a scrollbar across
+ * the middle of the pane. And the pane's own scrolling never engaged, so the
+ * view was as tall as the JSON instead of as tall as the pane.
+ *
+ * So the overflow goes back to `visible` and the pane scrolls, both ways.
+ */
 .pane.source pre.raw {
   max-height: none;
-  border: 0;
   padding: 6px 0;
+  overflow: visible;
+  border: 0;
   background: none;
 }
 
