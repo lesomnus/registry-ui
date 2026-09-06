@@ -523,7 +523,19 @@ input[type="search"]:focus {
 .list {
   flex: 1;
   margin: 0;
-  padding: 0 max(2px, calc(17px - var(--sb, 0px))) 12px;
+
+  /*
+   * The 6px on top is clearance for the first row, which has a 6px radius and
+   * a background when it is the selected one -- against the filter box it read
+   * as stuck to it.
+   *
+   * Inside the scroller rather than under the box, so it scrolls away: the
+   * shadow still starts at the filter box's edge, and by the time there is one
+   * to see this is gone. Nothing in render/list.ts has to know -- the row
+   * window overscans eight rows either way, and the anchor is taken and
+   * restored against the same origin, so the offset cancels.
+   */
+  padding: 6px max(2px, calc(17px - var(--sb, 0px))) 12px;
   overflow-y: auto;
   scrollbar-gutter: stable both-edges;
 }
