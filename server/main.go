@@ -91,6 +91,30 @@ func page(root string) http.Handler {
 			return
 		}
 
+		// What a browser may keep. Said here because `http.ServeContent` sets
+		// `Last-Modified` and no `Cache-Control`, and a browser with neither
+		// falls back to a heuristic -- commonly a tenth of the file's age. In an
+		// image that age is the **build time**, so the longer a deployment sits
+		// on one pin the longer an upgrade stays invisible. Nothing is red while
+		// it does: the server is right, the bundle is right, and only the page
+		// somebody sees is old.
+		//
+		// Two rules, and they are a pair. vite names what it writes under
+		// `assets/` after the contents, so a change is a new name and a year is
+		// safe -- and that is what makes asking for the page every time cost
+		// nothing. `no-cache` is *revalidate before using*, not *do not store*:
+		// an unchanged page ends in a `304`.
+		//
+		// Chosen from the request path. There is no fallback here -- an unknown
+		// path is a 404, as the comment above says -- so the path and the file
+		// agree; a server that did fall back would have to decide before the
+		// rewrite, or hand its shell an asset's year.
+		if strings.HasPrefix(r.URL.Path, "/assets/") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "no-cache")
+		}
+
 		files.ServeHTTP(w, r)
 	})
 }
