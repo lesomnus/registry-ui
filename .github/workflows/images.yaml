@@ -10,6 +10,7 @@ on:
       - Dockerfile
       - Dockerfile.server
       - go.mod
+      - scripts/**
       - server/**
       - src/**
       - index.html
@@ -71,6 +72,72 @@ jobs:
             page.cache-to=type=gha,scope=page,mode=max
             server.cache-from=type=gha,scope=server
             server.cache-to=type=gha,scope=server,mode=max
+
+      # The SBOM attached to each pushed image, as an OCI referrer -- where a
+      # scanner looks without pulling the image (`trivy image --sbom-sources
+      # oci`, Dependency-Track's sbom-sync in wed.hday.dev). Two scans made one
+      # (scripts/sbommerge), because each sees what the other cannot:
+      #
+      #   the build's   package-lock.json, for the npm packages the page is
+      #                 built from. vite bundles them into one file, and no scan
+      #                 of the image takes that apart again. Dev dependencies are
+      #                 not in it (syft leaves them out of a lockfile by default):
+      #                 they build the page and are not shipped.
+      #   the image's   the image as pushed: the base's packages, and
+      #                 static-web-server or the Go binary.
+      #
+      # One platform, amd64: both platforms are built from the same sources
+      # and bases. No file list -- the packages are what a scanner reads. The
+      # image's scan does not read SBOM files inside the image (sbom-cataloger
+      # is off by default), so nothing is counted twice from there.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # Run on a pull request too, so a change to the merge is checked before
+      # it is the thing every published image's SBOM goes through.
+      - name: Test the SBOM merge
+        run: go test ./scripts/...
+
+      - name: SBOM
+        if: github.event_name == 'push'
+        env:
+          METADATA: ${{ steps.build.outputs.metadata }}
+          SYFT: anchore/syft:v1.54.1
+        run: |
+          set -eu
+          mkdir -p out
+          syft() {
+            docker run --rm -v "$PWD:/src:ro" \
+              -e SYFT_FILE_METADATA_SELECTION=none -e SYFT_CHECK_FOR_APP_UPDATE=false \
+              "$SYFT" "$@"
+          }
+          syft scan dir:/src --quiet --select-catalogers javascript \
+            --source-name registry-ui --source-version "${BUILD_HASH}" \
+            -o cyclonedx-json > out/build.cdx.json
+          for target in page server; do
+            ref="$(printf '%s' "$METADATA" | jq -r --arg t "$target" '.[$t]["image.name"] | split(",")[0] | sub(":[^:/]+$"; "")')"
+            digest="$(printf '%s' "$METADATA" | jq -r --arg t "$target" '.[$t]["containerimage.digest"]')"
+            syft scan "registry:${ref}@${digest}" --platform linux/amd64 --quiet -o cyclonedx-json > "out/${target}.image.cdx.json"
+            mkdir -p "out/${target}"
+            go run ./scripts/sbommerge out/build.cdx.json "out/${target}.image.cdx.json" > "out/${target}/sbom.cdx.json"
+            jq -r --arg t "$target" '"\($t): \(.components | length) components, \([.components[] | select((.licenses // []) | length > 0)] | length) with a license"' "out/${target}/sbom.cdx.json"
+            echo "${target}=${ref}@${digest}" >> out/images.txt
+          done
+
+      - uses: oras-project/setup-oras@v1
+        if: github.event_name == 'push'
+
+      # From inside each directory: oras records the path it is given as the
+      # file's title, and a reader pulling the SBOM should get `sbom.cdx.json`.
+      - name: Attach the SBOMs
+        if: github.event_name == 'push'
+        run: |
+          set -eu
+          while IFS='=' read -r target image; do
+            (cd "out/${target}" && oras attach --artifact-type application/vnd.cyclonedx+json \
+              "${image}" sbom.cdx.json:application/vnd.cyclonedx+json)
+          done < out/images.txt
 
       # What was pushed, said once, rather than left for somebody to ask the
       # registry what a moving tag points at now.

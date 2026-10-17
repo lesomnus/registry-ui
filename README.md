@@ -222,7 +222,28 @@ moves — which is what a deployment meant to stay put pins.
 There is no test job, because there is nothing for one to do that the build does
 not: `Dockerfile.server` runs `go vet` and `go test` in its build stage, and both
 images run `tsc --noEmit` through `npm run build`. What is published has been
-checked by having been built.
+checked by having been built. The one step that tests something outside the
+images is `go test ./scripts/...`, for the SBOM merge below.
+
+**Each pushed image carries an SBOM**: a CycloneDX document attached as an OCI
+referrer (`application/vnd.cyclonedx+json`), so a scanner finds it without
+pulling the image:
+
+```bash
+oras discover ghcr.io/lesomnus/registry-ui:edge
+trivy image --sbom-sources oci ghcr.io/lesomnus/registry-ui/server:edge
+```
+
+It is two scans merged into one ([`scripts/sbommerge`](scripts/sbommerge)), because
+each sees what the other cannot. The first is of `package-lock.json`, which lists
+the npm packages the page is built from; vite bundles those into a single file, so
+no scan of the image can find them again. Dev dependencies are left out, because
+they are not shipped. The second is of the image as pushed, which finds the base's
+packages and the Go binary. The scan is of `linux/amd64`; both platforms are built
+from the same sources and bases.
+
+One thing is in neither: static-web-server is a Rust binary that carries no
+dependency metadata, so the page image's SBOM does not list what it is built from.
 
 Two images, because they are two different things.
 
