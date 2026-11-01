@@ -10,7 +10,7 @@
 # cannot ask it anything and something has to ask on its behalf.
 
 # See Dockerfile: the page has no architecture, so it is built on the builder's.
-FROM --platform=$BUILDPLATFORM node:24-alpine AS page
+FROM --platform=$BUILDPLATFORM node:26-alpine AS page
 WORKDIR /src
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
