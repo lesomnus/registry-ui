@@ -27,7 +27,7 @@ RUN npm run build
 # The alpine variant rather than the scratch one, because the entrypoint needs a
 # shell to turn the environment into config.json. That is the only reason; the
 # server is the same binary.
-FROM joseluisq/static-web-server:2.44.0-alpine
+FROM joseluisq/static-web-server:2.44.1-alpine
 
 # Owned by the uid the image runs as, so the entrypoint can write config.json
 # into it at startup.
