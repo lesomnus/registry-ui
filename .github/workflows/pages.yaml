@@ -42,7 +42,7 @@ jobs:
       # Deployed with whatever `config.json` is in the repository, and with none
       # if there is none -- the page then opens with an empty form, which is the
       # right default for a page anybody can load.
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
