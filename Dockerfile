@@ -12,7 +12,7 @@
 # On the builder's own architecture: what comes out is JavaScript, which has
 # none, and building it under emulation for a second platform is minutes spent
 # producing the same bytes.
-FROM --platform=$BUILDPLATFORM node:24-alpine AS build
+FROM --platform=$BUILDPLATFORM node:26-alpine AS build
 WORKDIR /src
 
 # The lockfile pins oci-client to a commit; `npm ci` honours that, and the
