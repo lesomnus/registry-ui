@@ -45,7 +45,7 @@ jobs:
       # builds -- both images, both platforms -- it just does not publish, so a
       # change that breaks the build or the tests fails here rather than after
       # it lands.
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         if: github.event_name == 'push'
         with:
           registry: ghcr.io
